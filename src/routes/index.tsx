@@ -38,7 +38,7 @@ function CatalogPage() {
 
   // ⚠️ Todos los hooks deben ir ANTES de cualquier return condicional
   const visibles = useMemo(
-    () => state.productos.filter((p) => p.disponible && (activeCat === "todos" || p.categoriaId === activeCat)),
+    () => state.productos.filter((p) => p.disponible && (activeCat === "todos" || p.categorias.includes(activeCat))),
     [state.productos, activeCat],
   );
 

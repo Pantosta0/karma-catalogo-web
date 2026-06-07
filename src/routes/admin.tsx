@@ -27,13 +27,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Plus, Pencil, Trash2, LogOut, Store, Tag, ImageOff, ArrowLeft, X } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
@@ -172,7 +165,8 @@ function ProductsTab() {
   const [creating, setCreating] = useState(false);
   const [toDelete, setToDelete] = useState<Product | null>(null);
 
-  const catName = (id: string) => state.categorias.find((c) => c.id === id)?.nombre ?? "—";
+  const catNames = (ids: string[]) =>
+    ids.map((id) => state.categorias.find((c) => c.id === id)?.nombre).filter(Boolean).join(" · ") || "—";
 
   return (
     <div className="space-y-4">
@@ -199,7 +193,7 @@ function ProductsTab() {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-semibold text-sm line-clamp-1">{p.nombre}</p>
-                  <p className="text-xs text-muted-foreground">{catName(p.categoriaId)}</p>
+                  <p className="text-xs text-muted-foreground">{catNames(p.categorias)}</p>
                 </div>
                 <p className="text-primary font-bold whitespace-nowrap">{formatCOP(p.precio)}</p>
               </div>
@@ -296,13 +290,13 @@ function ProductFormDialog({
   const [nombre, setNombre] = useState(product?.nombre ?? "");
   const [descripcion, setDescripcion] = useState(product?.descripcion ?? "");
   const [precio, setPrecio] = useState<string>(product?.precio?.toString() ?? "");
-  const [categoriaId, setCategoriaId] = useState(product?.categoriaId ?? state.categorias[0]?.id ?? "");
+  const [categorias, setCategorias] = useState<string[]>(product?.categorias ?? []);
   const [foto, setFoto] = useState(product?.foto ?? "");
   const [disponible, setDisponible] = useState(product?.disponible ?? true);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // reset cuando cambia product/open
-  useState(() => {});
+  const toggleCat = (id: string) =>
+    setCategorias((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
 
   const handleFile = (f: File) => {
     if (f.size > 2 * 1024 * 1024) {
@@ -316,21 +310,21 @@ function ProductFormDialog({
 
   const submit = () => {
     const p = parseInt(precio, 10);
-    if (!nombre.trim() || !categoriaId || isNaN(p) || p < 0) return;
+    if (!nombre.trim() || categorias.length === 0 || isNaN(p) || p < 0) return;
     onSave({
       id: product?.id ?? uid(),
       nombre: nombre.trim(),
       descripcion: descripcion.trim().slice(0, 120),
       precio: p,
-      categoriaId,
+      categorias,
       foto,
       disponible,
     });
     onClose();
-    // reset
     setNombre("");
     setDescripcion("");
     setPrecio("");
+    setCategorias([]);
     setFoto("");
     setDisponible(true);
   };
@@ -344,14 +338,14 @@ function ProductFormDialog({
           setNombre(product.nombre);
           setDescripcion(product.descripcion);
           setPrecio(product.precio.toString());
-          setCategoriaId(product.categoriaId);
+          setCategorias(product.categorias);
           setFoto(product.foto);
           setDisponible(product.disponible);
         } else if (o && !product) {
           setNombre("");
           setDescripcion("");
           setPrecio("");
-          setCategoriaId(state.categorias[0]?.id ?? "");
+          setCategorias([]);
           setFoto("");
           setDisponible(true);
         }
@@ -402,26 +396,34 @@ function ProductFormDialog({
             <Label htmlFor="desc">Descripción ({descripcion.length}/120)</Label>
             <Textarea id="desc" value={descripcion} onChange={(e) => setDescripcion(e.target.value.slice(0, 120))} rows={2} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="pre">Precio (COP)</Label>
-              <Input id="pre" type="number" min="0" value={precio} onChange={(e) => setPrecio(e.target.value)} />
+          <div>
+            <Label htmlFor="pre">Precio (COP)</Label>
+            <Input id="pre" type="number" min="0" value={precio} onChange={(e) => setPrecio(e.target.value)} />
+          </div>
+          <div>
+            <Label>Categorías <span className="text-muted-foreground font-normal">(selecciona una o más)</span></Label>
+            <div className="mt-1.5 flex flex-wrap gap-2">
+              {state.categorias.map((c) => {
+                const active = categorias.includes(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => toggleCat(c.id)}
+                    className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                      active
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-card text-foreground border-border hover:bg-muted"
+                    }`}
+                  >
+                    {c.nombre}
+                  </button>
+                );
+              })}
             </div>
-            <div>
-              <Label>Categoría</Label>
-              <Select value={categoriaId} onValueChange={setCategoriaId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar" />
-                </SelectTrigger>
-                <SelectContent>
-                  {state.categorias.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {categorias.length === 0 && (
+              <p className="text-xs text-destructive mt-1">Selecciona al menos una categoría.</p>
+            )}
           </div>
           <label className="flex items-center justify-between bg-muted rounded-lg p-3">
             <span className="text-sm font-medium">Disponible en el catálogo</span>
@@ -456,7 +458,7 @@ function CategoriesTab() {
   };
 
   const remove = (c: Category) => {
-    if (state.productos.some((p) => p.categoriaId === c.id)) {
+    if (state.productos.some((p) => p.categorias.includes(c.id))) {
       alert("No se puede eliminar: hay productos en esta categoría.");
       return;
     }

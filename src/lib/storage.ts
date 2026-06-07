@@ -10,7 +10,7 @@ export type Product = {
   nombre: string;
   descripcion: string;
   precio: number;
-  categoriaId: string;
+  categorias: string[];
   foto: string; // base64 data url o url
   disponible: boolean;
 };
@@ -51,7 +51,7 @@ export const DEFAULT_STATE: AppState = {
       nombre: "Karma Burger",
       descripcion: "Carne angus, queso cheddar, cebolla caramelizada y salsa secreta.",
       precio: 22000,
-      categoriaId: "hamburguesas",
+      categorias: ["hamburguesas"],
       foto: "",
       disponible: true,
     },
@@ -60,7 +60,7 @@ export const DEFAULT_STATE: AppState = {
       nombre: "Doble Karma",
       descripcion: "Doble carne, doble queso. Lo que te mereces.",
       precio: 28000,
-      categoriaId: "hamburguesas",
+      categorias: ["hamburguesas"],
       foto: "",
       disponible: true,
     },
@@ -69,7 +69,7 @@ export const DEFAULT_STATE: AppState = {
       nombre: "Asado de Tira",
       descripcion: "Asado a las brasas con chimichurri y papas rústicas.",
       precio: 38000,
-      categoriaId: "asados",
+      categorias: ["asados"],
       foto: "",
       disponible: true,
     },
@@ -78,7 +78,7 @@ export const DEFAULT_STATE: AppState = {
       nombre: "Combo Karma",
       descripcion: "Karma Burger + papas medianas + bebida.",
       precio: 32000,
-      categoriaId: "combos",
+      categorias: ["combos", "hamburguesas"],
       foto: "",
       disponible: true,
     },
@@ -87,7 +87,7 @@ export const DEFAULT_STATE: AppState = {
       nombre: "Limonada de Coco",
       descripcion: "Fresca, cremosa y con un toque de menta.",
       precio: 9000,
-      categoriaId: "bebidas",
+      categorias: ["bebidas"],
       foto: "",
       disponible: true,
     },
@@ -142,13 +142,17 @@ export async function loadStateFromSupabase(): Promise<AppState> {
 
     const productos: Product[] = (prodRes.data ?? []).map((p: {
       id: string; nombre: string; descripcion: string; precio: number;
-      categoria_id: string; foto: string; disponible: boolean;
+      categorias: string[] | null; categoria_id: string | null;
+      foto: string; disponible: boolean;
     }) => ({
       id: p.id,
       nombre: p.nombre,
       descripcion: p.descripcion ?? "",
       precio: p.precio,
-      categoriaId: p.categoria_id,
+      // soporta schema nuevo (categorias text[]) y legacy (categoria_id text)
+      categorias: Array.isArray(p.categorias) && p.categorias.length > 0
+        ? p.categorias
+        : p.categoria_id ? [p.categoria_id] : [],
       foto: p.foto ?? "",
       disponible: p.disponible,
     }));
@@ -212,7 +216,7 @@ export async function saveStateToSupabase(state: AppState): Promise<void> {
           nombre: p.nombre,
           descripcion: p.descripcion,
           precio: p.precio,
-          categoria_id: p.categoriaId,
+          categorias: p.categorias,
           foto: p.foto,
           disponible: p.disponible,
         }))
