@@ -6,6 +6,7 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import { useEffect } from "react";
+import { useAppState } from "@/lib/app-store";
 
 function NotFoundComponent() {
   return (
@@ -72,19 +73,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Los Buñuelos Los Originales — Pide en línea" },
-      { name: "description", content: "Pide buñuelos, comidas, bebidas y combos. Los Originales, directo a tu casa por WhatsApp." },
-      { property: "og:title", content: "Los Buñuelos Los Originales" },
-      { property: "og:description", content: "Catálogo de comida callejera. Pide fácil por WhatsApp." },
+      { title: "Karma — Menú" },
+      { name: "description", content: "Restaurante de comida rápida y asados. Pide directo por WhatsApp." },
+      { property: "og:title", content: "Karma — Menú" },
+      { property: "og:description", content: "Restaurante de comida rápida y asados. Pide directo por WhatsApp." },
       { property: "og:type", content: "website" },
-    ],
-    links: [
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap",
-      },
     ],
   }),
 
@@ -95,6 +88,39 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const { state } = useAppState();
+
+  // ── Favicon dinámico desde el logo cuadrado ──────────────────────────────
+  useEffect(() => {
+    const logo = state.config.logoSquare;
+    if (!logo) return;
+    let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = "icon";
+      document.head.appendChild(link);
+    }
+    link.href = logo;
+    link.type = logo.startsWith("data:image/png") ? "image/png" : "image/jpeg";
+  }, [state.config.logoSquare]);
+
+  // ── Título y meta description dinámicos desde la config ──────────────────
+  useEffect(() => {
+    const nombre = state.config.nombre || "Karma";
+    document.title = `${nombre} — Menú`;
+
+    const ogTitle = document.querySelector<HTMLMetaElement>('meta[property="og:title"]');
+    if (ogTitle) ogTitle.setAttribute("content", `${nombre} — Menú`);
+
+    const desc = state.config.seoDescription;
+    if (!desc) return;
+
+    const metaDesc = document.querySelector<HTMLMetaElement>('meta[name="description"]');
+    if (metaDesc) metaDesc.setAttribute("content", desc);
+
+    const ogDesc = document.querySelector<HTMLMetaElement>('meta[property="og:description"]');
+    if (ogDesc) ogDesc.setAttribute("content", desc);
+  }, [state.config.nombre, state.config.seoDescription]);
 
   return (
     <QueryClientProvider client={queryClient}>

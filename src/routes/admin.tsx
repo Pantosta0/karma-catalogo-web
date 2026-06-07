@@ -44,12 +44,15 @@ function AdminPage() {
   const [tab, setTab] = useState<"productos" | "categorias" | "negocio">("productos");
 
   if (loading) {
+    const logoUrl = state.config.logoSquare || logoAsset.url;
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-10 w-10 rounded-full border-4 border-primary border-t-transparent animate-spin" />
-          <p className="text-muted-foreground text-sm">Cargando…</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-8">
+        <div className="relative flex items-center justify-center">
+          <span className="absolute h-28 w-28 rounded-full bg-primary/20 animate-ping" style={{ animationDuration: "1.6s" }} />
+          <span className="absolute h-20 w-20 rounded-full bg-primary/10" />
+          <img src={logoUrl} alt="Karma" className="relative h-16 w-16 object-contain" />
         </div>
+        <p className="font-display text-[11px] tracking-[0.35em] text-muted-foreground">CARGANDO</p>
       </div>
     );
   }
@@ -508,6 +511,7 @@ function BusinessTab() {
   const [whatsapp, setWhatsapp] = useState(state.config.whatsapp);
   const [logoSquare, setLogoSquare] = useState(state.config.logoSquare);
   const [logoRect, setLogoRect] = useState(state.config.logoRect);
+  const [seoDescription, setSeoDescription] = useState(state.config.seoDescription);
   const [saved, setSaved] = useState(false);
   const fileSquareRef = useRef<HTMLInputElement>(null);
   const fileRectRef = useRef<HTMLInputElement>(null);
@@ -528,7 +532,13 @@ function BusinessTab() {
   const guardar = () => {
     update((s) => ({
       ...s,
-      config: { nombre: nombre.trim(), whatsapp: whatsapp.replace(/\D/g, ""), logoSquare, logoRect },
+      config: {
+        nombre: nombre.trim(),
+        whatsapp: whatsapp.replace(/\D/g, ""),
+        logoSquare,
+        logoRect,
+        seoDescription: seoDescription.trim(),
+      },
     }));
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -598,6 +608,38 @@ function BusinessTab() {
           Ej: 573001112233 (Colombia +57). Aquí llegarán los pedidos.
         </p>
       </div>
+
+      {/* ── SEO ─────────────────────────────────────────────────────────────── */}
+      <div className="pt-2 border-t border-border">
+        <p className="text-sm font-semibold mb-3">SEO / Redes sociales</p>
+        <div className="space-y-3">
+          <div>
+            <Label htmlFor="seo-title">Título de la pestaña</Label>
+            <Input
+              id="seo-title"
+              value={`${nombre || "Karma"} — Menú`}
+              readOnly
+              className="opacity-60 cursor-not-allowed"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Se genera automáticamente desde el nombre del negocio.
+            </p>
+          </div>
+          <div>
+            <Label htmlFor="seo-desc">
+              Meta descripción <span className="text-muted-foreground font-normal">({seoDescription.length}/160)</span>
+            </Label>
+            <Textarea
+              id="seo-desc"
+              value={seoDescription}
+              onChange={(e) => setSeoDescription(e.target.value.slice(0, 160))}
+              rows={3}
+              placeholder="Breve descripción que aparece en Google y al compartir en redes sociales."
+            />
+          </div>
+        </div>
+      </div>
+
       <div className="flex items-center gap-3">
         <Button onClick={guardar} className="bg-gradient-brand text-brand-foreground">
           Guardar cambios
