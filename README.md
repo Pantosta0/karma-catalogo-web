@@ -1,11 +1,12 @@
-# Karma Catálogo Web
+# Karma — Catálogo Web
 
-Catálogo digital con carrito de compras y envío de pedidos por WhatsApp. Pensado para pequeños negocios que quieren una vitrina online sencilla y sin complicaciones.
+Catálogo digital con carrito de compras y envío de pedidos por WhatsApp. Pensado para restaurantes y negocios de comida rápida.
 
 ## Qué hace
 
-- **Catálogo filtrable por categorías** — cuadrícula tipo Instagram con foto, nombre y precio de cada producto.
-- **Carrito con checkout por WhatsApp** — el cliente llena nombre, dirección, teléfono y medio de pago; la app arma el mensaje y abre WhatsApp con un solo clic.
+- **Catálogo filtrable por categorías** — cuadrícula con foto, nombre y precio de cada producto.
+- **Productos en múltiples categorías** — un producto puede aparecer en Hamburguesas y también en Promociones al mismo tiempo.
+- **Carrito con checkout por WhatsApp** — el cliente llena nombre, dirección, teléfono y medio de pago; la app arma el mensaje y abre WhatsApp con un clic.
 - **Panel de administración** (`/admin`) — CRUD de productos, categorías y configuración del negocio (nombre, WhatsApp, logo). Protegido con usuario y contraseña.
 - **Persistencia dual** — usa Supabase como base de datos principal y `localStorage` como caché/fallback automático si Supabase no está disponible.
 
@@ -39,7 +40,7 @@ Obtén estos valores en [supabase.com](https://supabase.com) → tu proyecto →
 
 ## Base de datos (Supabase)
 
-Crea las siguientes tablas en tu proyecto de Supabase:
+Crea las siguientes tablas en el **SQL Editor** de tu proyecto:
 
 ```sql
 -- Configuración del negocio
@@ -59,26 +60,32 @@ create table categorias (
   orden integer default 0
 );
 
--- Productos
+-- Productos (categorias es un array de IDs)
 create table productos (
   id text primary key,
   nombre text,
   descripcion text,
   precio numeric,
-  categoria_id text references categorias(id),
+  categorias text[],
   foto text,
   disponible boolean default true
 );
+
+-- Deshabilitar RLS (la app usa la anon key para leer y escribir)
+alter table config disable row level security;
+alter table categorias disable row level security;
+alter table productos disable row level security;
+
+-- Fila inicial de config
+insert into config (id, nombre, whatsapp, logo, admin_user, admin_pass)
+values (1, 'Karma', '573001234567', '', 'kevin', 'Karma_2026_!');
 ```
 
 ## Desarrollo local
 
 ```bash
-# Instalar dependencias
-bun install   # o npm install
-
-# Servidor de desarrollo
-bun run dev   # o npm run dev
+npm install
+npm run dev
 ```
 
 La app queda en `http://localhost:5173`.
@@ -86,7 +93,7 @@ La app queda en `http://localhost:5173`.
 ## Build y deploy
 
 ```bash
-bun run build   # genera la carpeta dist/
+npm run build   # genera la carpeta dist/
 ```
 
 ### Cloudflare Pages
@@ -95,7 +102,13 @@ bun run build   # genera la carpeta dist/
 |---|---|
 | Build command | `npm run build` |
 | Build output directory | `dist` |
-| Variables de entorno | `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` |
+| Node.js version | `20` |
+| Variable `VITE_SUPABASE_URL` | URL de tu proyecto Supabase |
+| Variable `VITE_SUPABASE_ANON_KEY` | Anon key de tu proyecto Supabase |
+
+El archivo `public/_redirects` ya está incluido para que el SPA funcione correctamente en todas las rutas.
+
+Para conectar tu dominio: Cloudflare Pages → tu proyecto → **Custom domains**. Si el dominio ya está en Cloudflare lo detecta y agrega el CNAME automáticamente.
 
 ## Estructura del proyecto
 
