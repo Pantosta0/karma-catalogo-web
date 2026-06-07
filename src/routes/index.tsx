@@ -42,15 +42,20 @@ function CatalogPage() {
     [state.productos, activeCat],
   );
 
-  const logoUrl = state.config.logo || logoAsset.url;
+  const logoUrl = state.config.logoSquare || logoAsset.url;
+  const logoHeaderUrl = state.config.logoRect || state.config.logoSquare || logoAsset.url;
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-10 w-10 rounded-full border-4 border-primary border-t-transparent animate-spin" />
-          <p className="text-muted-foreground text-sm">Cargando catálogo…</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-8">
+        <div className="relative flex items-center justify-center">
+          <span className="absolute h-28 w-28 rounded-full bg-primary/20 animate-ping" style={{ animationDuration: "1.6s" }} />
+          <span className="absolute h-20 w-20 rounded-full bg-primary/10" />
+          {logoUrl && (
+            <img src={logoUrl} alt="Karma" className="relative h-16 w-16 object-contain" />
+          )}
         </div>
+        <p className="font-display text-[11px] tracking-[0.35em] text-muted-foreground">CARGANDO</p>
       </div>
     );
   }
@@ -60,7 +65,7 @@ function CatalogPage() {
       {/* Header */}
       <header className="sticky top-0 z-30 backdrop-blur-md bg-background/85 border-b border-border/60">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-          <img src={logoUrl} alt={state.config.nombre} className="h-12 sm:h-14 w-auto" />
+          <img src={logoHeaderUrl} alt={state.config.nombre} className="h-12 sm:h-14 w-auto" />
           <div className="flex-1" />
           <Link
             to="/admin"

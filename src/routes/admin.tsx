@@ -65,7 +65,7 @@ function AdminPage() {
           <Link to="/" className="text-muted-foreground hover:text-primary" aria-label="Volver">
             <ArrowLeft className="h-5 w-5" />
           </Link>
-          <img src={state.config.logo || logoAsset.url} alt="" className="h-9 w-auto" />
+          <img src={state.config.logoRect || state.config.logoSquare || logoAsset.url} alt="" className="h-9 w-auto" />
           <div>
             <h1 className="font-display font-bold text-primary leading-none">Panel de administración</h1>
             <p className="text-xs text-muted-foreground">{state.config.nombre}</p>
@@ -122,7 +122,7 @@ function LoginScreen() {
     }
   };
 
-  const logoUrl = state.config.logo || logoAsset.url;
+  const logoUrl = state.config.logoSquare || logoAsset.url;
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
@@ -506,22 +506,30 @@ function BusinessTab() {
   const { state, update } = useAppState();
   const [nombre, setNombre] = useState(state.config.nombre);
   const [whatsapp, setWhatsapp] = useState(state.config.whatsapp);
-  const [logo, setLogo] = useState(state.config.logo);
+  const [logoSquare, setLogoSquare] = useState(state.config.logoSquare);
+  const [logoRect, setLogoRect] = useState(state.config.logoRect);
   const [saved, setSaved] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const fileSquareRef = useRef<HTMLInputElement>(null);
+  const fileRectRef = useRef<HTMLInputElement>(null);
 
-  const handleLogo = (f: File) => {
+  const handleLogo = (f: File, type: "square" | "rect") => {
     if (f.size > 1024 * 1024) {
       alert("El logo debe ser menor a 1MB");
       return;
     }
     const r = new FileReader();
-    r.onload = () => setLogo(r.result as string);
+    r.onload = () => {
+      if (type === "square") setLogoSquare(r.result as string);
+      else setLogoRect(r.result as string);
+    };
     r.readAsDataURL(f);
   };
 
   const guardar = () => {
-    update((s) => ({ ...s, config: { nombre: nombre.trim(), whatsapp: whatsapp.replace(/\D/g, ""), logo } }));
+    update((s) => ({
+      ...s,
+      config: { nombre: nombre.trim(), whatsapp: whatsapp.replace(/\D/g, ""), logoSquare, logoRect },
+    }));
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -530,27 +538,46 @@ function BusinessTab() {
     <div className="space-y-4 max-w-xl">
       <h2 className="font-display text-lg font-bold">Configuración del negocio</h2>
       <div>
-        <Label>Logo personalizado (opcional)</Label>
-        <div className="mt-1 flex items-center gap-3">
-          <div className="h-16 w-32 rounded-lg bg-muted overflow-hidden flex items-center justify-center p-1">
-            <img src={logo || logoAsset.url} alt="" className="max-h-full max-w-full object-contain" />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
-              Subir logo
-            </Button>
-            {logo && (
-              <Button type="button" variant="ghost" size="sm" onClick={() => setLogo("")}>
-                Restaurar predeterminado
+        <Label>Logos</Label>
+        <div className="mt-2 grid grid-cols-2 gap-4">
+          {/* Logo cuadrado */}
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Cuadrado <span className="text-muted-foreground font-normal text-xs">(loading · login)</span></p>
+            <div className="h-20 w-20 rounded-lg bg-muted overflow-hidden flex items-center justify-center p-1 border border-border">
+              <img src={logoSquare || logoAsset.url} alt="" className="max-h-full max-w-full object-contain" />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Button type="button" variant="outline" size="sm" onClick={() => fileSquareRef.current?.click()}>
+                Subir
               </Button>
-            )}
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              hidden
-              onChange={(e) => e.target.files?.[0] && handleLogo(e.target.files[0])}
-            />
+              {logoSquare && (
+                <Button type="button" variant="ghost" size="sm" onClick={() => setLogoSquare("")}>
+                  Quitar
+                </Button>
+              )}
+            </div>
+            <input ref={fileSquareRef} type="file" accept="image/*" hidden
+              onChange={(e) => e.target.files?.[0] && handleLogo(e.target.files[0], "square")} />
+          </div>
+
+          {/* Logo rectangular */}
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Rectangular <span className="text-muted-foreground font-normal text-xs">(header)</span></p>
+            <div className="h-20 w-40 rounded-lg bg-muted overflow-hidden flex items-center justify-center p-2 border border-border">
+              <img src={logoRect || logoAsset.url} alt="" className="max-h-full max-w-full object-contain" />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Button type="button" variant="outline" size="sm" onClick={() => fileRectRef.current?.click()}>
+                Subir
+              </Button>
+              {logoRect && (
+                <Button type="button" variant="ghost" size="sm" onClick={() => setLogoRect("")}>
+                  Quitar
+                </Button>
+              )}
+            </div>
+            <input ref={fileRectRef} type="file" accept="image/*" hidden
+              onChange={(e) => e.target.files?.[0] && handleLogo(e.target.files[0], "rect")} />
           </div>
         </div>
       </div>

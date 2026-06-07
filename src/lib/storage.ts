@@ -18,7 +18,8 @@ export type Product = {
 export type BusinessConfig = {
   nombre: string;
   whatsapp: string; // formato internacional sin + (ej: 573001112233)
-  logo: string;
+  logoSquare: string; // icono/marca cuadrado — loading screen y login
+  logoRect: string;   // logo rectangular — header
 };
 
 export type AppState = {
@@ -42,7 +43,8 @@ export const DEFAULT_STATE: AppState = {
   config: {
     nombre: "Karma",
     whatsapp: "573001234567",
-    logo: "",
+    logoSquare: "",
+    logoRect: "",
   },
   categorias: DEFAULT_CATEGORIES,
   productos: [
@@ -131,7 +133,8 @@ export async function loadStateFromSupabase(): Promise<AppState> {
     }
 
     const raw = configRes.data as {
-      nombre: string; whatsapp: string; logo: string;
+      nombre: string; whatsapp: string;
+      logo_square: string; logo_rect: string;
       admin_user: string; admin_pass: string;
     };
 
@@ -158,7 +161,12 @@ export async function loadStateFromSupabase(): Promise<AppState> {
     }));
 
     const state: AppState = {
-      config: { nombre: raw.nombre, whatsapp: raw.whatsapp, logo: raw.logo ?? "" },
+      config: {
+        nombre: raw.nombre,
+        whatsapp: raw.whatsapp,
+        logoSquare: raw.logo_square ?? "",
+        logoRect: raw.logo_rect ?? "",
+      },
       categorias,
       productos,
       adminAuth: { user: raw.admin_user, pass: raw.admin_pass },
@@ -184,7 +192,8 @@ export async function saveStateToSupabase(state: AppState): Promise<void> {
       id: 1,
       nombre: state.config.nombre,
       whatsapp: state.config.whatsapp,
-      logo: state.config.logo,
+      logo_square: state.config.logoSquare,
+      logo_rect: state.config.logoRect,
       admin_user: state.adminAuth.user,
       admin_pass: state.adminAuth.pass,
     });
