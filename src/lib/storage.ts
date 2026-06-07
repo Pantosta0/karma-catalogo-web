@@ -32,15 +32,15 @@ export type AppState = {
 // ─── Valores por defecto ──────────────────────────────────────────────────────
 
 const DEFAULT_CATEGORIES: Category[] = [
-  { id: "comidas", nombre: "Comidas" },
+  { id: "hamburguesas", nombre: "Hamburguesas" },
+  { id: "asados", nombre: "Asados" },
   { id: "bebidas", nombre: "Bebidas" },
   { id: "combos", nombre: "Combos" },
-  { id: "extras", nombre: "Extras" },
 ];
 
 export const DEFAULT_STATE: AppState = {
   config: {
-    nombre: "Los Buñuelos Los Originales",
+    nombre: "Karma",
     whatsapp: "573001234567",
     logo: "",
   },
@@ -48,39 +48,57 @@ export const DEFAULT_STATE: AppState = {
   productos: [
     {
       id: "p1",
-      nombre: "Buñuelo Clásico",
-      descripcion: "Crujiente por fuera, esponjoso por dentro. El original.",
-      precio: 2500,
-      categoriaId: "comidas",
+      nombre: "Karma Burger",
+      descripcion: "Carne angus, queso cheddar, cebolla caramelizada y salsa secreta.",
+      precio: 22000,
+      categoriaId: "hamburguesas",
       foto: "",
       disponible: true,
     },
     {
       id: "p2",
-      nombre: "Combo Buñuelo + Chocolate",
-      descripcion: "Tres buñuelos recién hechos con chocolate caliente.",
-      precio: 9000,
-      categoriaId: "combos",
+      nombre: "Doble Karma",
+      descripcion: "Doble carne, doble queso. Lo que te mereces.",
+      precio: 28000,
+      categoriaId: "hamburguesas",
       foto: "",
       disponible: true,
     },
     {
       id: "p3",
-      nombre: "Aguapanela con Limón",
-      descripcion: "Bebida tradicional fría o caliente.",
-      precio: 4000,
+      nombre: "Asado de Tira",
+      descripcion: "Asado a las brasas con chimichurri y papas rústicas.",
+      precio: 38000,
+      categoriaId: "asados",
+      foto: "",
+      disponible: true,
+    },
+    {
+      id: "p4",
+      nombre: "Combo Karma",
+      descripcion: "Karma Burger + papas medianas + bebida.",
+      precio: 32000,
+      categoriaId: "combos",
+      foto: "",
+      disponible: true,
+    },
+    {
+      id: "p5",
+      nombre: "Limonada de Coco",
+      descripcion: "Fresca, cremosa y con un toque de menta.",
+      precio: 9000,
       categoriaId: "bebidas",
       foto: "",
       disponible: true,
     },
   ],
-  adminAuth: { user: "admin", pass: "bunuelos2025" },
+  adminAuth: { user: "kevin", pass: "Karma_2026_!" },
   adminSession: false,
 };
 
 // ─── Helpers localStorage (fallback) ─────────────────────────────────────────
 
-const LS_KEY = "bunuelos_app_v1";
+const LS_KEY = "karma_app_v1";
 
 function lsLoad(): AppState | null {
   try {

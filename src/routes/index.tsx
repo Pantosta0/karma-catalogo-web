@@ -21,8 +21,8 @@ import { ShoppingCart, Plus, Minus, Trash2, ImageOff, Send, Settings } from "luc
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Los Buñuelos Los Originales — Catálogo" },
-      { name: "description", content: "🧡Kiosco los buñuelos los originales + de 10 años en el mercado" },
+      { title: "Karma — Menú" },
+      { name: "description", content: "Sabes lo que hiciste. Te lo mereces hoy. Karma, restaurante de comida rápida y asados." },
     ],
   }),
   component: CatalogPage,
@@ -114,10 +114,10 @@ function CatalogPage() {
       {/* Hero strip */}
       <section className="max-w-5xl mx-auto px-4 pt-6 pb-4">
         <h1 className="text-2xl sm:text-3xl font-display font-bold text-primary text-balance">
-          Crujientes, doraditos y recién hechos 💙
+          Sabes lo que hiciste. Te lo mereces hoy.
         </h1>
         <p className="text-sm sm:text-base text-muted-foreground mt-1">
-          Elige tus favoritos y envía tu pedido directo por WhatsApp.
+          Elige tu pedido y envíalo directo por WhatsApp.
         </p>
       </section>
 

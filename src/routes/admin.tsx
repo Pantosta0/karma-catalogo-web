@@ -39,7 +39,7 @@ import { Plus, Pencil, Trash2, LogOut, Store, Tag, ImageOff, ArrowLeft, X } from
 export const Route = createFileRoute("/admin")({
   head: () => ({
     meta: [
-      { title: "Admin — Los Buñuelos" },
+      { title: "Admin — Karma" },
       { name: "robots", content: "noindex" },
     ],
   }),
