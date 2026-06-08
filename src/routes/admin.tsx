@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useRef } from "react";
 import { useAppState } from "@/lib/app-store";
 import { uid, type Product, type Category } from "@/lib/storage";
+import { compressImage } from "@/lib/image";
 import { formatCOP } from "@/lib/cart";
 import logoAsset from "@/assets/logo-bunuelos.png.asset.json";
 import { Button } from "@/components/ui/button";
@@ -302,13 +303,14 @@ function ProductFormDialog({
     setCategorias((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
 
   const handleFile = (f: File) => {
-    if (f.size > 2 * 1024 * 1024) {
-      alert("La imagen debe ser menor a 2MB");
+    // Límite generoso — la compresión reduce el tamaño real antes de guardar
+    if (f.size > 15 * 1024 * 1024) {
+      alert("La imagen es demasiado grande (máx 15 MB)");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => setFoto(reader.result as string);
-    reader.readAsDataURL(f);
+    compressImage(f, 900, "jpeg", 0.82)
+      .then(setFoto)
+      .catch(() => alert("No se pudo procesar la imagen"));
   };
 
   const submit = () => {
@@ -517,16 +519,18 @@ function BusinessTab() {
   const fileRectRef = useRef<HTMLInputElement>(null);
 
   const handleLogo = (f: File, type: "square" | "rect") => {
-    if (f.size > 1024 * 1024) {
-      alert("El logo debe ser menor a 1MB");
+    if (f.size > 15 * 1024 * 1024) {
+      alert("El archivo es demasiado grande (máx 15 MB)");
       return;
     }
-    const r = new FileReader();
-    r.onload = () => {
-      if (type === "square") setLogoSquare(r.result as string);
-      else setLogoRect(r.result as string);
-    };
-    r.readAsDataURL(f);
+    // Logos: PNG para mantener transparencia; cuadrado max 400px, rect max 800px
+    const maxPx = type === "square" ? 400 : 800;
+    compressImage(f, maxPx, "png")
+      .then((url) => {
+        if (type === "square") setLogoSquare(url);
+        else setLogoRect(url);
+      })
+      .catch(() => alert("No se pudo procesar el logo"));
   };
 
   const guardar = () => {
