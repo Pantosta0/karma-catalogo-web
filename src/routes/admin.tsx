@@ -539,7 +539,25 @@ function BusinessTab() {
   const [schedule, setSchedule] = useState<DaySchedule[]>(
     state.config.schedule?.length === 7 ? state.config.schedule : DEFAULT_SCHEDULE
   );
+  const [globalFrom, setGlobalFrom] = useState(() => {
+    const first = (state.config.schedule ?? DEFAULT_SCHEDULE).find((d) => d.open);
+    return first?.from ?? "12:00";
+  });
+  const [globalTo, setGlobalTo] = useState(() => {
+    const first = (state.config.schedule ?? DEFAULT_SCHEDULE).find((d) => d.open);
+    return first?.to ?? "22:00";
+  });
   const [saved, setSaved] = useState(false);
+
+  // Sincronizar estado local cuando state.config.schedule cambia (ej: carga desde Supabase)
+  useEffect(() => {
+    const sched = state.config.schedule;
+    if (Array.isArray(sched) && sched.length === 7) {
+      setSchedule(sched);
+      const first = sched.find((d) => d.open);
+      if (first) { setGlobalFrom(first.from); setGlobalTo(first.to); }
+    }
+  }, [state.config.schedule]); // eslint-disable-line react-hooks/exhaustive-deps
   const fileSquareRef = useRef<HTMLInputElement>(null);
   const fileRectRef = useRef<HTMLInputElement>(null);
 
@@ -667,6 +685,42 @@ function BusinessTab() {
         <p className="text-sm font-semibold mb-3 flex items-center gap-2">
           <Clock className="h-4 w-4" /> Horarios de atención
         </p>
+
+        {/* Horario global: aplica a todos los días activos */}
+        <div className="flex flex-wrap items-center gap-2 mb-4 p-3 bg-muted/40 rounded-xl border border-border">
+          <span className="text-xs font-semibold text-muted-foreground shrink-0 w-full sm:w-auto">
+            Todos los días activos:
+          </span>
+          <input
+            type="time"
+            value={globalFrom}
+            onChange={(e) => setGlobalFrom(e.target.value)}
+            className="bg-background border border-border rounded-md px-2 py-1 text-sm w-28"
+          />
+          <span className="text-muted-foreground text-xs">→</span>
+          <input
+            type="time"
+            value={globalTo}
+            onChange={(e) => setGlobalTo(e.target.value)}
+            className="bg-background border border-border rounded-md px-2 py-1 text-sm w-28"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            onClick={() => {
+              if (globalFrom && globalTo) {
+                setSchedule((prev) =>
+                  prev.map((d) => d.open ? { ...d, from: globalFrom, to: globalTo } : d)
+                );
+              }
+            }}
+          >
+            Aplicar a todos
+          </Button>
+        </div>
+
         <div className="space-y-2">
           {["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"].map((day, i) => {
             // Mostrar lunes primero visualmente

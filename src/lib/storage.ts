@@ -209,6 +209,11 @@ export async function loadStateFromSupabase(): Promise<AppState> {
       if (!promoRes.error && promoRes.data) promos = promoRes.data as Promo[];
     } catch { /* tabla aún no creada */ }
 
+    // Usamos la caché de localStorage como segundo fallback para campos que
+    // todavía no existan en Supabase (ej: schedule antes de correr el ALTER TABLE).
+    // Así no sobreescribimos lo que el usuario había guardado.
+    const cached = lsLoad();
+
     const state: AppState = {
       config: {
         nombre: raw.nombre,
@@ -219,7 +224,9 @@ export async function loadStateFromSupabase(): Promise<AppState> {
         ogImage: raw.og_image ?? "",
         schedule: Array.isArray(raw.schedule) && raw.schedule.length === 7
           ? raw.schedule
-          : DEFAULT_SCHEDULE,
+          : Array.isArray(cached?.config?.schedule) && cached.config.schedule.length === 7
+            ? cached.config.schedule
+            : DEFAULT_SCHEDULE,
       },
       categorias,
       productos,
