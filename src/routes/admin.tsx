@@ -304,6 +304,19 @@ function ProductFormDialog({
   const [disponible, setDisponible] = useState(product?.disponible ?? true);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Sincronizar form cuando el diálogo abre o cambia el producto seleccionado
+  useEffect(() => {
+    if (open) {
+      setNombre(product?.nombre ?? "");
+      setDescripcion(product?.descripcion ?? "");
+      setPrecio(product?.precio?.toString() ?? "");
+      setCategorias(product?.categorias ?? []);
+      setFoto(product?.foto ?? "");
+      setDisponible(product?.disponible ?? true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, product?.id]);
+
   const toggleCat = (id: string) =>
     setCategorias((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
 
