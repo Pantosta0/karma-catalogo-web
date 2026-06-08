@@ -2,7 +2,8 @@ interface Props {
   logoUrl?: string;
 }
 
-export function LoadingScreen({ logoUrl }: Props) {
+export function LoadingScreen({ logoUrl: logoProp }: Props) {
+  const logoUrl = logoProp || "/favicon.png";
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-8">
       <div className="relative flex items-center justify-center">
@@ -14,7 +15,7 @@ export function LoadingScreen({ logoUrl }: Props) {
         <span className="absolute h-20 w-20 rounded-full bg-primary/10" />
 
         {/* Logo con efecto fill de color */}
-        {logoUrl ? (
+        {logoUrl && (
           <div className="relative h-16 w-16">
             {/* Capa base: escala de grises (estado "vacío") */}
             <img
@@ -34,9 +35,6 @@ export function LoadingScreen({ logoUrl }: Props) {
               }}
             />
           </div>
-        ) : (
-          // Sin logo: solo el anillo
-          <span className="h-10 w-10 rounded-full border-4 border-primary border-t-transparent animate-spin" />
         )}
       </div>
       <p className="font-display text-[11px] tracking-[0.35em] text-muted-foreground">
