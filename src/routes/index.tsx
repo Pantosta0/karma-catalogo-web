@@ -54,11 +54,17 @@ function CatalogPage() {
 
   const isOpen = getIsOpen(state.config.schedule);
   const pillRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const barRef = useRef<HTMLDivElement>(null);
+  const [slider, setSlider] = useState<{ left: number; width: number } | null>(null);
 
-  // Desplazar el pill activo al centro de la barra de categorías
+  // Mover el indicador deslizante al pill activo
   useEffect(() => {
     const el = pillRefs.current.get(activeCat);
-    el?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    if (el) {
+      setSlider({ left: el.offsetLeft, width: el.offsetWidth });
+      // Solo hace scroll si el pill está fuera del área visible
+      el.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
+    }
   }, [activeCat]);
 
   // Mostrar promo activa una vez por sesión
@@ -136,8 +142,20 @@ function CatalogPage() {
         </div>
 
         {/* Category bar */}
-        <div className="max-w-5xl mx-auto px-4 pb-3 overflow-x-auto">
-          <div className="flex gap-2 min-w-max">
+        <div className="max-w-5xl mx-auto px-4 pb-3 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div ref={barRef} className="relative flex gap-2 min-w-max">
+            {/* Indicador deslizante */}
+            {slider && (
+              <div
+                aria-hidden="true"
+                className="absolute top-0 bottom-0 rounded-full bg-primary shadow-soft pointer-events-none"
+                style={{
+                  left: slider.left,
+                  width: slider.width,
+                  transition: "left 220ms cubic-bezier(0.4,0,0.2,1), width 220ms cubic-bezier(0.4,0,0.2,1)",
+                }}
+              />
+            )}
             <CategoryPill
               active={activeCat === "todos"}
               ref={(el) => { if (el) pillRefs.current.set("todos", el); else pillRefs.current.delete("todos"); }}
@@ -278,10 +296,10 @@ const CategoryPill = forwardRef<
   <button
     ref={ref}
     onClick={onClick}
-    className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-all duration-200 shadow-soft ${
+    className={`relative z-10 px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-colors duration-200 ${
       active
-        ? "bg-primary text-primary-foreground scale-105"
-        : "bg-card text-foreground hover:bg-muted border border-border"
+        ? "text-primary-foreground"
+        : "text-muted-foreground hover:text-foreground"
     }`}
   >
     {children}
