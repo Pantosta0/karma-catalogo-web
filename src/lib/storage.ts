@@ -28,6 +28,7 @@ export type BusinessConfig = {
   logoSquare: string;     // icono/marca cuadrado — loading screen, login y favicon
   logoRect: string;       // logo rectangular — header
   seoDescription: string; // meta description y og:description
+  ogImage: string;         // URL absoluta de imagen para og:image (redes sociales)
   schedule: DaySchedule[]; // 7 entradas [0=Dom, 1=Lun, ..., 6=Sáb]
 };
 
@@ -76,6 +77,7 @@ export const DEFAULT_STATE: AppState = {
     logoSquare: "",
     logoRect: "",
     seoDescription: "Restaurante de comida rápida y asados. Pide directo por WhatsApp.",
+    ogImage: "",
     schedule: DEFAULT_SCHEDULE,
   },
   categorias: DEFAULT_CATEGORIES,
@@ -174,6 +176,7 @@ export async function loadStateFromSupabase(): Promise<AppState> {
       nombre: string; whatsapp: string;
       logo_square: string; logo_rect: string;
       seo_description: string;
+      og_image: string;
       schedule: DaySchedule[] | null;
       admin_user: string; admin_pass: string;
     };
@@ -213,6 +216,7 @@ export async function loadStateFromSupabase(): Promise<AppState> {
         logoSquare: raw.logo_square ?? "",
         logoRect: raw.logo_rect ?? "",
         seoDescription: raw.seo_description ?? "",
+        ogImage: raw.og_image ?? "",
         schedule: Array.isArray(raw.schedule) && raw.schedule.length === 7
           ? raw.schedule
           : DEFAULT_SCHEDULE,
@@ -248,6 +252,7 @@ export async function saveStateToSupabase(state: AppState): Promise<void> {
       logo_square: state.config.logoSquare,
       logo_rect: state.config.logoRect,
       seo_description: state.config.seoDescription,
+      og_image: state.config.ogImage,
       schedule: state.config.schedule,
       admin_user: state.adminAuth.user,
       admin_pass: state.adminAuth.pass,

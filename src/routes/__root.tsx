@@ -104,7 +104,7 @@ function RootComponent() {
     link.type = logo.startsWith("data:image/png") ? "image/png" : "image/jpeg";
   }, [state.config.logoSquare]);
 
-  // ── Título y meta description dinámicos desde la config ──────────────────
+  // ── Título, description y og:image dinámicos desde la config ────────────
   useEffect(() => {
     const nombre = state.config.nombre || "Karma";
     document.title = `${nombre} — Menú`;
@@ -113,14 +113,26 @@ function RootComponent() {
     if (ogTitle) ogTitle.setAttribute("content", `${nombre} — Menú`);
 
     const desc = state.config.seoDescription;
-    if (!desc) return;
+    if (desc) {
+      const metaDesc = document.querySelector<HTMLMetaElement>('meta[name="description"]');
+      if (metaDesc) metaDesc.setAttribute("content", desc);
+      const ogDesc = document.querySelector<HTMLMetaElement>('meta[property="og:description"]');
+      if (ogDesc) ogDesc.setAttribute("content", desc);
+    }
 
-    const metaDesc = document.querySelector<HTMLMetaElement>('meta[name="description"]');
-    if (metaDesc) metaDesc.setAttribute("content", desc);
-
-    const ogDesc = document.querySelector<HTMLMetaElement>('meta[property="og:description"]');
-    if (ogDesc) ogDesc.setAttribute("content", desc);
-  }, [state.config.nombre, state.config.seoDescription]);
+    const ogImageUrl = state.config.ogImage;
+    let ogImg = document.querySelector<HTMLMetaElement>('meta[property="og:image"]');
+    if (ogImageUrl) {
+      if (!ogImg) {
+        ogImg = document.createElement("meta");
+        ogImg.setAttribute("property", "og:image");
+        document.head.appendChild(ogImg);
+      }
+      ogImg.setAttribute("content", ogImageUrl);
+    } else if (ogImg) {
+      ogImg.remove();
+    }
+  }, [state.config.nombre, state.config.seoDescription, state.config.ogImage]);
 
   return (
     <QueryClientProvider client={queryClient}>

@@ -521,6 +521,7 @@ function BusinessTab() {
   const [logoSquare, setLogoSquare] = useState(state.config.logoSquare);
   const [logoRect, setLogoRect] = useState(state.config.logoRect);
   const [seoDescription, setSeoDescription] = useState(state.config.seoDescription);
+  const [ogImage, setOgImage] = useState(state.config.ogImage ?? "");
   const [schedule, setSchedule] = useState<DaySchedule[]>(
     state.config.schedule?.length === 7 ? state.config.schedule : DEFAULT_SCHEDULE
   );
@@ -552,6 +553,7 @@ function BusinessTab() {
         logoSquare,
         logoRect,
         seoDescription: seoDescription.trim(),
+        ogImage: ogImage.trim(),
         schedule,
       },
     }));
@@ -706,6 +708,18 @@ function BusinessTab() {
               rows={3}
               placeholder="Breve descripción que aparece en Google y al compartir en redes sociales."
             />
+          </div>
+          <div>
+            <Label htmlFor="og-image">Imagen para redes sociales (og:image)</Label>
+            <Input
+              id="og-image"
+              value={ogImage}
+              onChange={(e) => setOgImage(e.target.value)}
+              placeholder="https://tudominio.com/imagen.jpg"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              URL pública de la imagen que aparece al compartir el link en WhatsApp, Instagram, etc. Mínimo 1200×630px recomendado.
+            </p>
           </div>
         </div>
       </div>
