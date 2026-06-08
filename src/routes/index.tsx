@@ -3,7 +3,6 @@ import { useMemo, useState, useEffect } from "react";
 import { useAppState } from "@/lib/app-store";
 import { useCart, formatCOP } from "@/lib/cart";
 import type { Product, DaySchedule } from "@/lib/storage";
-import logoAsset from "@/assets/logo-bunuelos.png.asset.json";
 import {
   Dialog,
   DialogContent,
@@ -72,8 +71,8 @@ function CatalogPage() {
     [state.productos, activeCat],
   );
 
-  const logoUrl = state.config.logoSquare || logoAsset.url;
-  const logoHeaderUrl = state.config.logoRect || state.config.logoSquare || logoAsset.url;
+  const logoUrl = state.config.logoSquare;
+  const logoHeaderUrl = state.config.logoRect || state.config.logoSquare;
 
   if (loading) {
     return (

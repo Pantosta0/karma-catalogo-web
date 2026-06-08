@@ -4,7 +4,6 @@ import { useAppState } from "@/lib/app-store";
 import { uid, DEFAULT_SCHEDULE, type Product, type Category, type DaySchedule, type Promo } from "@/lib/storage";
 import { compressImage } from "@/lib/image";
 import { formatCOP } from "@/lib/cart";
-import logoAsset from "@/assets/logo-bunuelos.png.asset.json";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,7 +44,7 @@ function AdminPage() {
   const [tab, setTab] = useState<"productos" | "categorias" | "negocio" | "promos">("productos");
 
   if (loading) {
-    const logoUrl = state.config.logoSquare || logoAsset.url;
+    const logoUrl = state.config.logoSquare;
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-8">
         <div className="relative flex items-center justify-center">
@@ -69,7 +68,9 @@ function AdminPage() {
           <Link to="/" className="text-muted-foreground hover:text-primary" aria-label="Volver">
             <ArrowLeft className="h-5 w-5" />
           </Link>
-          <img src={state.config.logoRect || state.config.logoSquare || logoAsset.url} alt="" className="h-9 w-auto" />
+          {(state.config.logoRect || state.config.logoSquare) && (
+            <img src={state.config.logoRect || state.config.logoSquare} alt="" className="h-9 w-auto" />
+          )}
           <div>
             <h1 className="font-display font-bold text-primary leading-none">Panel de administración</h1>
             <p className="text-xs text-muted-foreground">{state.config.nombre}</p>
@@ -132,7 +133,7 @@ function LoginScreen() {
     }
   };
 
-  const logoUrl = state.config.logoSquare || logoAsset.url;
+  const logoUrl = state.config.logoSquare;
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
@@ -568,7 +569,9 @@ function BusinessTab() {
           <div className="space-y-2">
             <p className="text-sm font-medium">Cuadrado <span className="text-muted-foreground font-normal text-xs">(loading · login)</span></p>
             <div className="h-20 w-20 rounded-lg bg-muted overflow-hidden flex items-center justify-center p-1 border border-border">
-              <img src={logoSquare || logoAsset.url} alt="" className="max-h-full max-w-full object-contain" />
+              {logoSquare
+                ? <img src={logoSquare} alt="" className="max-h-full max-w-full object-contain" />
+                : <ImageOff className="h-6 w-6 text-muted-foreground" />}
             </div>
             <div className="flex flex-col gap-1.5">
               <Button type="button" variant="outline" size="sm" onClick={() => fileSquareRef.current?.click()}>
@@ -588,7 +591,9 @@ function BusinessTab() {
           <div className="space-y-2">
             <p className="text-sm font-medium">Rectangular <span className="text-muted-foreground font-normal text-xs">(header)</span></p>
             <div className="h-20 w-40 rounded-lg bg-muted overflow-hidden flex items-center justify-center p-2 border border-border">
-              <img src={logoRect || logoAsset.url} alt="" className="max-h-full max-w-full object-contain" />
+              {logoRect
+                ? <img src={logoRect} alt="" className="max-h-full max-w-full object-contain" />
+                : <ImageOff className="h-6 w-6 text-muted-foreground" />}
             </div>
             <div className="flex flex-col gap-1.5">
               <Button type="button" variant="outline" size="sm" onClick={() => fileRectRef.current?.click()}>

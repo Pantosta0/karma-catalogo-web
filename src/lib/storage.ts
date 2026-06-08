@@ -135,6 +135,10 @@ export const DEFAULT_STATE: AppState = {
 
 const LS_KEY = "karma_app_v1";
 
+export function loadCachedState(): AppState | null {
+  return lsLoad();
+}
+
 function lsLoad(): AppState | null {
   try {
     const raw = localStorage.getItem(LS_KEY);

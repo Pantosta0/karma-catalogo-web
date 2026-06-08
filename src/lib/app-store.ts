@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
-import { loadStateFromSupabase, saveStateToSupabase, DEFAULT_STATE, type AppState } from "./storage";
+import { loadStateFromSupabase, saveStateToSupabase, loadCachedState, DEFAULT_STATE, type AppState } from "./storage";
 
-// Cache compartida entre todos los componentes que usen el hook
-let memoryState: AppState | null = null;
+// Cache compartida entre todos los componentes que usen el hook.
+// Se pre-carga desde localStorage para que el loading screen ya tenga el logo.
+let memoryState: AppState | null = loadCachedState();
 let loadPromise: Promise<AppState> | null = null;
 const listeners = new Set<(s: AppState) => void>();
 
