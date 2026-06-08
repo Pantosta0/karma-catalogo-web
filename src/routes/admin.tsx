@@ -3,6 +3,7 @@ import { useState, useRef } from "react";
 import { useAppState } from "@/lib/app-store";
 import { uid, DEFAULT_SCHEDULE, type Product, type Category, type DaySchedule, type Promo } from "@/lib/storage";
 import { compressImage } from "@/lib/image";
+import { hashPassword, verifyPassword, isHashed } from "@/lib/crypto";
 import { formatCOP } from "@/lib/cart";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -123,11 +124,19 @@ function LoginScreen() {
   const [pass, setPass] = useState("");
   const [error, setError] = useState("");
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (user === state.adminAuth.user && pass === state.adminAuth.pass) {
+    const userOk = user === state.adminAuth.user;
+    const passOk = await verifyPassword(pass, state.adminAuth.pass);
+    if (userOk && passOk) {
       sessionStorage.setItem("karma_admin", "1");
-      update((s) => ({ ...s, adminSession: true }));
+      // Migrar contraseña a hash si aún está en texto plano
+      if (!isHashed(state.adminAuth.pass)) {
+        const hashed = await hashPassword(pass);
+        update((s) => ({ ...s, adminSession: true, adminAuth: { ...s.adminAuth, pass: hashed } }));
+      } else {
+        update((s) => ({ ...s, adminSession: true }));
+      }
     } else {
       setError("Usuario o contraseña incorrectos");
     }
@@ -522,6 +531,9 @@ function BusinessTab() {
   const [logoRect, setLogoRect] = useState(state.config.logoRect);
   const [seoDescription, setSeoDescription] = useState(state.config.seoDescription);
   const [ogImage, setOgImage] = useState(state.config.ogImage ?? "");
+  const [newPass, setNewPass] = useState("");
+  const [confirmPass, setConfirmPass] = useState("");
+  const [passError, setPassError] = useState("");
   const [schedule, setSchedule] = useState<DaySchedule[]>(
     state.config.schedule?.length === 7 ? state.config.schedule : DEFAULT_SCHEDULE
   );
@@ -544,7 +556,22 @@ function BusinessTab() {
       .catch(() => alert("No se pudo procesar el logo"));
   };
 
-  const guardar = () => {
+  const guardar = async () => {
+    setPassError("");
+    let newHashedPass: string | null = null;
+
+    if (newPass) {
+      if (newPass.length < 8) {
+        setPassError("La contraseña debe tener al menos 8 caracteres.");
+        return;
+      }
+      if (newPass !== confirmPass) {
+        setPassError("Las contraseñas no coinciden.");
+        return;
+      }
+      newHashedPass = await hashPassword(newPass);
+    }
+
     update((s) => ({
       ...s,
       config: {
@@ -556,8 +583,11 @@ function BusinessTab() {
         ogImage: ogImage.trim(),
         schedule,
       },
+      ...(newHashedPass ? { adminAuth: { ...s.adminAuth, pass: newHashedPass } } : {}),
     }));
     setSaved(true);
+    setNewPass("");
+    setConfirmPass("");
     setTimeout(() => setSaved(false), 2000);
   };
 
@@ -721,6 +751,33 @@ function BusinessTab() {
               URL pública de la imagen que aparece al compartir el link en WhatsApp, Instagram, etc. Mínimo 1200×630px recomendado.
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* ── Contraseña ───────────────────────────────────────────────────────── */}
+      <div className="pt-2 border-t border-border">
+        <p className="text-sm font-semibold mb-3">Cambiar contraseña</p>
+        <div className="space-y-3">
+          <div>
+            <Label htmlFor="new-pass">Nueva contraseña</Label>
+            <Input
+              id="new-pass"
+              type="password"
+              value={newPass}
+              onChange={(e) => setNewPass(e.target.value)}
+              placeholder="Dejar vacío para no cambiar"
+            />
+          </div>
+          <div>
+            <Label htmlFor="confirm-pass">Confirmar contraseña</Label>
+            <Input
+              id="confirm-pass"
+              type="password"
+              value={confirmPass}
+              onChange={(e) => setConfirmPass(e.target.value)}
+            />
+          </div>
+          {passError && <p className="text-sm text-destructive">{passError}</p>}
         </div>
       </div>
 

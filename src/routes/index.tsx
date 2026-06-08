@@ -17,16 +17,17 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ShoppingCart, Plus, Minus, Trash2, ImageOff, Send, Settings, X } from "lucide-react";
 
-// Calcula si el negocio está abierto ahora según el horario configurado
+// Calcula si el negocio está abierto ahora según el horario (zona horaria Bogotá)
 function getIsOpen(schedule: DaySchedule[] | undefined): boolean | null {
   if (!schedule || schedule.length !== 7) return null;
-  const now = new Date();
-  const ds = schedule[now.getDay()]; // 0=Dom
+  // Forzar hora de Bogotá (UTC-5) independientemente del dispositivo del cliente
+  const bogota = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Bogota" }));
+  const ds = schedule[bogota.getDay()]; // 0=Dom
   if (!ds) return null;
   if (!ds.open) return false;
   const [fh, fm] = ds.from.split(":").map(Number);
   const [th, tm] = ds.to.split(":").map(Number);
-  const mins = now.getHours() * 60 + now.getMinutes();
+  const mins = bogota.getHours() * 60 + bogota.getMinutes();
   return mins >= fh * 60 + fm && mins <= th * 60 + tm;
 }
 
