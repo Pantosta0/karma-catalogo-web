@@ -17,7 +17,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ShoppingCart, Plus, Minus, Trash2, ImageOff, Send, Settings, X } from "lucide-react";
 import { LoadingScreen } from "@/components/LoadingScreen";
-import { StickerBackground } from "@/components/StickerBackground";
 
 // Calcula si el negocio está abierto ahora según el horario (zona horaria Bogotá)
 function getIsOpen(schedule: DaySchedule[] | undefined): boolean | null {
@@ -94,7 +93,6 @@ function CatalogPage() {
 
   return (
     <div className="min-h-screen pb-32">
-      <StickerBackground />
       {/* Header */}
       <header className="sticky top-0 z-30 backdrop-blur-md bg-background/85 border-b border-border/60">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
