@@ -77,7 +77,7 @@ export function StickerBackground() {
       {PLACEMENTS.map(({ style }, i) => (
         <img
           key={i}
-          src="/stickers-sheet.jpg"
+          src="/stickers-sheet.png"
           alt=""
           draggable={false}
           className="absolute select-none"
