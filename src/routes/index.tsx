@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef, forwardRef } from "react";
 import { useAppState } from "@/lib/app-store";
 import { useCart, formatCOP } from "@/lib/cart";
 import type { Product, DaySchedule } from "@/lib/storage";
@@ -53,6 +53,13 @@ function CatalogPage() {
   const [activePromo, setActivePromo] = useState<(typeof state.promos)[0] | null>(null);
 
   const isOpen = getIsOpen(state.config.schedule);
+  const pillRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+
+  // Desplazar el pill activo al centro de la barra de categorías
+  useEffect(() => {
+    const el = pillRefs.current.get(activeCat);
+    el?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  }, [activeCat]);
 
   // Mostrar promo activa una vez por sesión
   useEffect(() => {
@@ -131,11 +138,20 @@ function CatalogPage() {
         {/* Category bar */}
         <div className="max-w-5xl mx-auto px-4 pb-3 overflow-x-auto">
           <div className="flex gap-2 min-w-max">
-            <CategoryPill active={activeCat === "todos"} onClick={() => setActiveCat("todos")}>
+            <CategoryPill
+              active={activeCat === "todos"}
+              ref={(el) => { if (el) pillRefs.current.set("todos", el); else pillRefs.current.delete("todos"); }}
+              onClick={() => setActiveCat("todos")}
+            >
               Todos
             </CategoryPill>
             {state.categorias.map((c) => (
-              <CategoryPill key={c.id} active={activeCat === c.id} onClick={() => setActiveCat(c.id)}>
+              <CategoryPill
+                key={c.id}
+                active={activeCat === c.id}
+                ref={(el) => { if (el) pillRefs.current.set(c.id, el); else pillRefs.current.delete(c.id); }}
+                onClick={() => setActiveCat(c.id)}
+              >
                 {c.nombre}
               </CategoryPill>
             ))}
@@ -255,28 +271,22 @@ function CatalogPage() {
   );
 }
 
-function CategoryPill({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition shadow-soft ${
-        active
-          ? "bg-primary text-primary-foreground"
-          : "bg-card text-foreground hover:bg-muted border border-border"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
+const CategoryPill = forwardRef<
+  HTMLButtonElement,
+  { active: boolean; onClick: () => void; children: React.ReactNode }
+>(({ active, onClick, children }, ref) => (
+  <button
+    ref={ref}
+    onClick={onClick}
+    className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-all duration-200 shadow-soft ${
+      active
+        ? "bg-primary text-primary-foreground scale-105"
+        : "bg-card text-foreground hover:bg-muted border border-border"
+    }`}
+  >
+    {children}
+  </button>
+));
 
 function ProductCard({
   product,

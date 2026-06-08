@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAppState } from "@/lib/app-store";
 import { uid, DEFAULT_SCHEDULE, type Product, type Category, type DaySchedule, type Promo } from "@/lib/storage";
 import { compressImage } from "@/lib/image";
@@ -909,6 +909,12 @@ function PromoFormDialog({
     setHasta(p?.hasta ?? "");
     setActivo(p?.activo ?? true);
   };
+
+  // Sincronizar form cuando el diálogo abre o cambia el promo seleccionado
+  useEffect(() => {
+    if (open) reset(promo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, promo?.id]);
 
   const submit = () => {
     if (!titulo.trim() || !desde || !hasta) return;
