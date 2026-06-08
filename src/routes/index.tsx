@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ShoppingCart, Plus, Minus, Trash2, ImageOff, Send, Settings, X } from "lucide-react";
+import { LoadingScreen } from "@/components/LoadingScreen";
 
 // Calcula si el negocio está abierto ahora según el horario (zona horaria Bogotá)
 function getIsOpen(schedule: DaySchedule[] | undefined): boolean | null {
@@ -75,20 +76,7 @@ function CatalogPage() {
   const logoUrl = state.config.logoSquare;
   const logoHeaderUrl = state.config.logoRect || state.config.logoSquare;
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-8">
-        <div className="relative flex items-center justify-center">
-          <span className="absolute h-28 w-28 rounded-full bg-primary/20 animate-ping" style={{ animationDuration: "1.6s" }} />
-          <span className="absolute h-20 w-20 rounded-full bg-primary/10" />
-          {logoUrl && (
-            <img src={logoUrl} alt="Karma" className="relative h-16 w-16 object-contain" />
-          )}
-        </div>
-        <p className="font-display text-[11px] tracking-[0.35em] text-muted-foreground">CARGANDO</p>
-      </div>
-    );
-  }
+  if (loading) return <LoadingScreen logoUrl={logoUrl} />;
 
   return (
     <div className="min-h-screen pb-32">

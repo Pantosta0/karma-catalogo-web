@@ -3,6 +3,7 @@ import { useState, useRef } from "react";
 import { useAppState } from "@/lib/app-store";
 import { uid, DEFAULT_SCHEDULE, type Product, type Category, type DaySchedule, type Promo } from "@/lib/storage";
 import { compressImage } from "@/lib/image";
+import { LoadingScreen } from "@/components/LoadingScreen";
 import { hashPassword, verifyPassword, isHashed } from "@/lib/crypto";
 import { formatCOP } from "@/lib/cart";
 import { Button } from "@/components/ui/button";
@@ -44,19 +45,7 @@ function AdminPage() {
   const { state, loading, update } = useAppState();
   const [tab, setTab] = useState<"productos" | "categorias" | "negocio" | "promos">("productos");
 
-  if (loading) {
-    const logoUrl = state.config.logoSquare;
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-8">
-        <div className="relative flex items-center justify-center">
-          <span className="absolute h-28 w-28 rounded-full bg-primary/20 animate-ping" style={{ animationDuration: "1.6s" }} />
-          <span className="absolute h-20 w-20 rounded-full bg-primary/10" />
-          <img src={logoUrl} alt="Karma" className="relative h-16 w-16 object-contain" />
-        </div>
-        <p className="font-display text-[11px] tracking-[0.35em] text-muted-foreground">CARGANDO</p>
-      </div>
-    );
-  }
+  if (loading) return <LoadingScreen logoUrl={state.config.logoSquare} />;
 
   if (!state.adminSession) {
     return <LoginScreen />;

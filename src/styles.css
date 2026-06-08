@@ -2,6 +2,12 @@
 @import "tw-animate-css";
 @source "../src";
 
+/* Loading: logo se llena de color de abajo hacia arriba */
+@keyframes karma-fill {
+  0%   { clip-path: inset(100% 0 0 0); }
+  100% { clip-path: inset(0% 0 0 0); }
+}
+
 
 @custom-variant dark (&:is(.dark *));
 
