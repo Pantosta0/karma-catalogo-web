@@ -15,23 +15,52 @@ export type Product = {
   disponible: boolean;
 };
 
+// Horario de un día: abierto/cerrado + franja horaria
+export type DaySchedule = {
+  open: boolean;
+  from: string; // "HH:MM"
+  to: string;   // "HH:MM"
+};
+
 export type BusinessConfig = {
   nombre: string;
   whatsapp: string;       // formato internacional sin + (ej: 573001112233)
   logoSquare: string;     // icono/marca cuadrado — loading screen, login y favicon
   logoRect: string;       // logo rectangular — header
   seoDescription: string; // meta description y og:description
+  schedule: DaySchedule[]; // 7 entradas [0=Dom, 1=Lun, ..., 6=Sáb]
+};
+
+export type Promo = {
+  id: string;
+  activo: boolean;
+  titulo: string;
+  descripcion: string;
+  imagen: string;  // data URL opcional
+  desde: string;   // "YYYY-MM-DD"
+  hasta: string;   // "YYYY-MM-DD"
 };
 
 export type AppState = {
   config: BusinessConfig;
   categorias: Category[];
   productos: Product[];
+  promos: Promo[];
   adminAuth: { user: string; pass: string };
   adminSession: boolean;
 };
 
 // ─── Valores por defecto ──────────────────────────────────────────────────────
+
+export const DEFAULT_SCHEDULE: DaySchedule[] = [
+  { open: false, from: "12:00", to: "22:00" }, // 0 Domingo
+  { open: true,  from: "12:00", to: "22:00" }, // 1 Lunes
+  { open: true,  from: "12:00", to: "22:00" }, // 2 Martes
+  { open: true,  from: "12:00", to: "22:00" }, // 3 Miércoles
+  { open: true,  from: "12:00", to: "22:00" }, // 4 Jueves
+  { open: true,  from: "12:00", to: "22:00" }, // 5 Viernes
+  { open: true,  from: "12:00", to: "23:00" }, // 6 Sábado
+];
 
 const DEFAULT_CATEGORIES: Category[] = [
   { id: "hamburguesas", nombre: "Hamburguesas" },
@@ -47,6 +76,7 @@ export const DEFAULT_STATE: AppState = {
     logoSquare: "",
     logoRect: "",
     seoDescription: "Restaurante de comida rápida y asados. Pide directo por WhatsApp.",
+    schedule: DEFAULT_SCHEDULE,
   },
   categorias: DEFAULT_CATEGORIES,
   productos: [
@@ -96,6 +126,7 @@ export const DEFAULT_STATE: AppState = {
       disponible: true,
     },
   ],
+  promos: [],
   adminAuth: { user: "kevin", pass: "Karma_2026_!" },
   adminSession: false,
 };
@@ -131,13 +162,15 @@ export async function loadStateFromSupabase(): Promise<AppState> {
 
     if (configRes.error || catRes.error || prodRes.error) {
       console.warn("[Supabase] Error cargando datos, usando localStorage:", configRes.error || catRes.error || prodRes.error);
-      return lsLoad() ?? DEFAULT_STATE;
+      const cached = lsLoad() ?? DEFAULT_STATE;
+      return { ...cached, adminSession: sessionStorage.getItem("karma_admin") === "1" };
     }
 
     const raw = configRes.data as {
       nombre: string; whatsapp: string;
       logo_square: string; logo_rect: string;
       seo_description: string;
+      schedule: DaySchedule[] | null;
       admin_user: string; admin_pass: string;
     };
 
@@ -155,13 +188,19 @@ export async function loadStateFromSupabase(): Promise<AppState> {
       nombre: p.nombre,
       descripcion: p.descripcion ?? "",
       precio: p.precio,
-      // soporta schema nuevo (categorias text[]) y legacy (categoria_id text)
       categorias: Array.isArray(p.categorias) && p.categorias.length > 0
         ? p.categorias
         : p.categoria_id ? [p.categoria_id] : [],
       foto: p.foto ?? "",
       disponible: p.disponible,
     }));
+
+    // Promos — tabla opcional, falla silenciosamente si no existe todavía
+    let promos: Promo[] = [];
+    try {
+      const promoRes = await supabase.from("promos").select("*");
+      if (!promoRes.error && promoRes.data) promos = promoRes.data as Promo[];
+    } catch { /* tabla aún no creada */ }
 
     const state: AppState = {
       config: {
@@ -170,18 +209,24 @@ export async function loadStateFromSupabase(): Promise<AppState> {
         logoSquare: raw.logo_square ?? "",
         logoRect: raw.logo_rect ?? "",
         seoDescription: raw.seo_description ?? "",
+        schedule: Array.isArray(raw.schedule) && raw.schedule.length === 7
+          ? raw.schedule
+          : DEFAULT_SCHEDULE,
       },
       categorias,
       productos,
+      promos,
       adminAuth: { user: raw.admin_user, pass: raw.admin_pass },
-      adminSession: false,
+      // Restaurar sesión desde sessionStorage (persiste en el tab, no en DB)
+      adminSession: sessionStorage.getItem("karma_admin") === "1",
     };
 
-    lsSave(state); // cache local
+    lsSave(state);
     return state;
   } catch (err) {
     console.warn("[Supabase] Excepción al cargar, usando localStorage:", err);
-    return lsLoad() ?? DEFAULT_STATE;
+    const cached = lsLoad() ?? DEFAULT_STATE;
+    return { ...cached, adminSession: sessionStorage.getItem("karma_admin") === "1" };
   }
 }
 
@@ -199,6 +244,7 @@ export async function saveStateToSupabase(state: AppState): Promise<void> {
       logo_square: state.config.logoSquare,
       logo_rect: state.config.logoRect,
       seo_description: state.config.seoDescription,
+      schedule: state.config.schedule,
       admin_user: state.adminAuth.user,
       admin_pass: state.adminAuth.pass,
     });
@@ -236,6 +282,16 @@ export async function saveStateToSupabase(state: AppState): Promise<void> {
         }))
       );
     }
+    // Sincronizar promos
+    try {
+      const promoIds = state.promos.map((p) => p.id);
+      if (promoIds.length > 0) {
+        await supabase.from("promos").delete().not("id", "in", `(${promoIds.map((id) => `'${id}'`).join(",")})`);
+        await supabase.from("promos").upsert(state.promos);
+      } else {
+        await supabase.from("promos").delete().neq("id", "__none__");
+      }
+    } catch { /* tabla aún no creada */ }
   } catch (err) {
     console.error("[Supabase] Error al guardar:", err);
   }

@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useAppState } from "@/lib/app-store";
 import { useCart, formatCOP } from "@/lib/cart";
-import type { Product } from "@/lib/storage";
+import type { Product, DaySchedule } from "@/lib/storage";
 import logoAsset from "@/assets/logo-bunuelos.png.asset.json";
 import {
   Dialog,
@@ -16,7 +16,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ShoppingCart, Plus, Minus, Trash2, ImageOff, Send, Settings } from "lucide-react";
+import { ShoppingCart, Plus, Minus, Trash2, ImageOff, Send, Settings, X } from "lucide-react";
+
+// Calcula si el negocio está abierto ahora según el horario configurado
+function getIsOpen(schedule: DaySchedule[] | undefined): boolean | null {
+  if (!schedule || schedule.length !== 7) return null;
+  const now = new Date();
+  const ds = schedule[now.getDay()]; // 0=Dom
+  if (!ds) return null;
+  if (!ds.open) return false;
+  const [fh, fm] = ds.from.split(":").map(Number);
+  const [th, tm] = ds.to.split(":").map(Number);
+  const mins = now.getHours() * 60 + now.getMinutes();
+  return mins >= fh * 60 + fm && mins <= th * 60 + tm;
+}
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -35,6 +48,23 @@ function CatalogPage() {
   const [selected, setSelected] = useState<Product | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [promoOpen, setPromoOpen] = useState(false);
+  const [activePromo, setActivePromo] = useState<(typeof state.promos)[0] | null>(null);
+
+  const isOpen = getIsOpen(state.config.schedule);
+
+  // Mostrar promo activa una vez por sesión
+  useEffect(() => {
+    if (loading) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const promo = state.promos?.find(
+      (p) => p.activo && today >= p.desde && today <= p.hasta
+    ) ?? null;
+    if (promo && !sessionStorage.getItem(`karma_promo_${promo.id}`)) {
+      setActivePromo(promo);
+      setPromoOpen(true);
+    }
+  }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ⚠️ Todos los hooks deben ir ANTES de cualquier return condicional
   const visibles = useMemo(
@@ -66,6 +96,15 @@ function CatalogPage() {
       <header className="sticky top-0 z-30 backdrop-blur-md bg-background/85 border-b border-border/60">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           <img src={logoHeaderUrl} alt={state.config.nombre} className="h-12 sm:h-14 w-auto" />
+          {isOpen !== null && (
+            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full shrink-0 ${
+              isOpen
+                ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                : "bg-red-500/20 text-red-400 border border-red-500/30"
+            }`}>
+              {isOpen ? "Abierto" : "Cerrado"}
+            </span>
+          )}
           <div className="flex-1" />
           <Link
             to="/admin"
@@ -163,6 +202,43 @@ function CatalogPage() {
           setSelected(null);
         }}
       />
+
+      {/* Promo popup */}
+      {activePromo && (
+        <Dialog open={promoOpen} onOpenChange={(o) => {
+          if (!o) {
+            sessionStorage.setItem(`karma_promo_${activePromo.id}`, "1");
+            setPromoOpen(false);
+          }
+        }}>
+          <DialogContent className="max-w-sm p-0 overflow-hidden gap-0">
+            {activePromo.imagen && (
+              <div className="aspect-video w-full bg-muted">
+                <img src={activePromo.imagen} alt={activePromo.titulo} className="w-full h-full object-cover" />
+              </div>
+            )}
+            <div className="p-5">
+              <DialogHeader>
+                <DialogTitle className="font-display text-xl">{activePromo.titulo}</DialogTitle>
+                {activePromo.descripcion && (
+                  <DialogDescription className="text-muted-foreground whitespace-pre-line">
+                    {activePromo.descripcion}
+                  </DialogDescription>
+                )}
+              </DialogHeader>
+              <Button
+                onClick={() => {
+                  sessionStorage.setItem(`karma_promo_${activePromo.id}`, "1");
+                  setPromoOpen(false);
+                }}
+                className="w-full mt-4 bg-gradient-brand text-brand-foreground"
+              >
+                ¡Entendido!
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Footer */}
       <footer className="mt-16 pb-8 text-center border-t border-border/40 pt-8 max-w-5xl mx-auto">

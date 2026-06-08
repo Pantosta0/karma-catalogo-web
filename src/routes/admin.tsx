@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useRef } from "react";
 import { useAppState } from "@/lib/app-store";
-import { uid, type Product, type Category } from "@/lib/storage";
+import { uid, DEFAULT_SCHEDULE, type Product, type Category, type DaySchedule, type Promo } from "@/lib/storage";
 import { compressImage } from "@/lib/image";
 import { formatCOP } from "@/lib/cart";
 import logoAsset from "@/assets/logo-bunuelos.png.asset.json";
@@ -28,7 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, LogOut, Store, Tag, ImageOff, ArrowLeft, X } from "lucide-react";
+import { Plus, Pencil, Trash2, LogOut, Store, Tag, ImageOff, ArrowLeft, X, Megaphone, Clock } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -42,7 +42,7 @@ export const Route = createFileRoute("/admin")({
 
 function AdminPage() {
   const { state, loading, update } = useAppState();
-  const [tab, setTab] = useState<"productos" | "categorias" | "negocio">("productos");
+  const [tab, setTab] = useState<"productos" | "categorias" | "negocio" | "promos">("productos");
 
   if (loading) {
     const logoUrl = state.config.logoSquare || logoAsset.url;
@@ -78,7 +78,10 @@ function AdminPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => update((s) => ({ ...s, adminSession: false }))}
+            onClick={() => {
+              sessionStorage.removeItem("karma_admin");
+              update((s) => ({ ...s, adminSession: false }));
+            }}
           >
             <LogOut className="h-4 w-4 mr-1" /> Salir
           </Button>
@@ -87,7 +90,8 @@ function AdminPage() {
           {([
             ["productos", "Productos", Store],
             ["categorias", "Categorías", Tag],
-            ["negocio", "Negocio", Store],
+            ["negocio", "Negocio", Clock],
+            ["promos", "Promos", Megaphone],
           ] as const).map(([k, label, Icon]) => (
             <button
               key={k}
@@ -106,6 +110,7 @@ function AdminPage() {
         {tab === "productos" && <ProductsTab />}
         {tab === "categorias" && <CategoriesTab />}
         {tab === "negocio" && <BusinessTab />}
+        {tab === "promos" && <PromosTab />}
       </main>
     </div>
   );
@@ -120,6 +125,7 @@ function LoginScreen() {
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (user === state.adminAuth.user && pass === state.adminAuth.pass) {
+      sessionStorage.setItem("karma_admin", "1");
       update((s) => ({ ...s, adminSession: true }));
     } else {
       setError("Usuario o contraseña incorrectos");
@@ -514,6 +520,9 @@ function BusinessTab() {
   const [logoSquare, setLogoSquare] = useState(state.config.logoSquare);
   const [logoRect, setLogoRect] = useState(state.config.logoRect);
   const [seoDescription, setSeoDescription] = useState(state.config.seoDescription);
+  const [schedule, setSchedule] = useState<DaySchedule[]>(
+    state.config.schedule?.length === 7 ? state.config.schedule : DEFAULT_SCHEDULE
+  );
   const [saved, setSaved] = useState(false);
   const fileSquareRef = useRef<HTMLInputElement>(null);
   const fileRectRef = useRef<HTMLInputElement>(null);
@@ -542,6 +551,7 @@ function BusinessTab() {
         logoSquare,
         logoRect,
         seoDescription: seoDescription.trim(),
+        schedule,
       },
     }));
     setSaved(true);
@@ -613,6 +623,57 @@ function BusinessTab() {
         </p>
       </div>
 
+      {/* ── Horarios ────────────────────────────────────────────────────────── */}
+      <div className="pt-2 border-t border-border">
+        <p className="text-sm font-semibold mb-3 flex items-center gap-2">
+          <Clock className="h-4 w-4" /> Horarios de atención
+        </p>
+        <div className="space-y-2">
+          {["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"].map((day, i) => {
+            // Mostrar lunes primero visualmente
+            const displayOrder = [1, 2, 3, 4, 5, 6, 0];
+            const idx = displayOrder[i];
+            const ds = schedule[idx];
+            return (
+              <div key={idx} className="flex items-center gap-3 text-sm">
+                <span className="w-8 text-muted-foreground font-medium shrink-0">
+                  {["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"][idx]}
+                </span>
+                <Switch
+                  checked={ds.open}
+                  onCheckedChange={(v) =>
+                    setSchedule((prev) => prev.map((d, j) => j === idx ? { ...d, open: v } : d))
+                  }
+                />
+                {ds.open ? (
+                  <>
+                    <input
+                      type="time"
+                      value={ds.from}
+                      onChange={(e) =>
+                        setSchedule((prev) => prev.map((d, j) => j === idx ? { ...d, from: e.target.value } : d))
+                      }
+                      className="bg-muted border border-border rounded-md px-2 py-1 text-sm w-28"
+                    />
+                    <span className="text-muted-foreground">→</span>
+                    <input
+                      type="time"
+                      value={ds.to}
+                      onChange={(e) =>
+                        setSchedule((prev) => prev.map((d, j) => j === idx ? { ...d, to: e.target.value } : d))
+                      }
+                      className="bg-muted border border-border rounded-md px-2 py-1 text-sm w-28"
+                    />
+                  </>
+                ) : (
+                  <span className="text-muted-foreground text-xs">Cerrado</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* ── SEO ─────────────────────────────────────────────────────────────── */}
       <div className="pt-2 border-t border-border">
         <p className="text-sm font-semibold mb-3">SEO / Redes sociales</p>
@@ -653,3 +714,228 @@ function BusinessTab() {
     </div>
   );
 }
+
+/* -------------------- Promos -------------------- */
+
+function PromosTab() {
+  const { state, update } = useAppState();
+  const [editing, setEditing] = useState<Promo | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [toDelete, setToDelete] = useState<Promo | null>(null);
+
+  return (
+    <div className="space-y-4 max-w-2xl">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="font-display text-lg font-bold">Promociones y anuncios</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Se muestran como popup al entrar al catálogo, una vez por sesión.
+          </p>
+        </div>
+        <Button onClick={() => setCreating(true)} className="bg-gradient-brand text-brand-foreground">
+          <Plus className="h-4 w-4 mr-1" /> Nueva
+        </Button>
+      </div>
+
+      {state.promos.length === 0 ? (
+        <div className="text-center py-16 text-muted-foreground border border-dashed border-border rounded-xl">
+          No hay promociones. Crea una para anunciar algo especial.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {state.promos.map((p) => {
+            const today = new Date().toISOString().slice(0, 10);
+            const active = p.activo && today >= p.desde && today <= p.hasta;
+            return (
+              <div key={p.id} className="bg-card border border-border rounded-xl p-4 flex gap-4">
+                {p.imagen && (
+                  <img src={p.imagen} alt="" className="h-16 w-16 rounded-lg object-cover shrink-0" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-semibold">{p.titulo}</p>
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                      active ? "bg-green-500/20 text-green-400" : p.activo ? "bg-yellow-500/20 text-yellow-400" : "bg-muted text-muted-foreground"
+                    }`}>
+                      {active ? "Activa ahora" : p.activo ? "Programada" : "Inactiva"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{p.descripcion}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{p.desde} → {p.hasta}</p>
+                </div>
+                <div className="flex flex-col gap-1 shrink-0">
+                  <Button size="icon" variant="ghost" onClick={() => setEditing(p)}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button size="icon" variant="ghost" onClick={() => setToDelete(p)}
+                    className="text-destructive hover:text-destructive">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <PromoFormDialog
+        open={creating || !!editing}
+        promo={editing}
+        onClose={() => { setCreating(false); setEditing(null); }}
+        onSave={(promo) => {
+          update((s) => ({
+            ...s,
+            promos: editing
+              ? s.promos.map((x) => (x.id === promo.id ? promo : x))
+              : [...s.promos, promo],
+          }));
+          setCreating(false);
+          setEditing(null);
+        }}
+      />
+
+      <AlertDialog open={!!toDelete} onOpenChange={(o) => !o && setToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar promoción?</AlertDialogTitle>
+            <AlertDialogDescription>Se eliminará "{toDelete?.titulo}".</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground"
+              onClick={() => {
+                if (toDelete) {
+                  update((s) => ({ ...s, promos: s.promos.filter((x) => x.id !== toDelete.id) }));
+                  setToDelete(null);
+                }
+              }}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+function PromoFormDialog({
+  open, promo, onClose, onSave,
+}: {
+  open: boolean;
+  promo: Promo | null;
+  onClose: () => void;
+  onSave: (p: Promo) => void;
+}) {
+  const [titulo, setTitulo] = useState(promo?.titulo ?? "");
+  const [descripcion, setDescripcion] = useState(promo?.descripcion ?? "");
+  const [imagen, setImagen] = useState(promo?.imagen ?? "");
+  const [desde, setDesde] = useState(promo?.desde ?? "");
+  const [hasta, setHasta] = useState(promo?.hasta ?? "");
+  const [activo, setActivo] = useState(promo?.activo ?? true);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const reset = (p: Promo | null) => {
+    setTitulo(p?.titulo ?? "");
+    setDescripcion(p?.descripcion ?? "");
+    setImagen(p?.imagen ?? "");
+    setDesde(p?.desde ?? "");
+    setHasta(p?.hasta ?? "");
+    setActivo(p?.activo ?? true);
+  };
+
+  const submit = () => {
+    if (!titulo.trim() || !desde || !hasta) return;
+    onSave({
+      id: promo?.id ?? uid(),
+      activo,
+      titulo: titulo.trim(),
+      descripcion: descripcion.trim(),
+      imagen,
+      desde,
+      hasta,
+    });
+    reset(null);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) { onClose(); reset(null); } else reset(promo); }}>
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="font-display">{promo ? "Editar promoción" : "Nueva promoción"}</DialogTitle>
+          <DialogDescription>El popup se muestra una vez por sesión cuando está activo y dentro del rango de fechas.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label>Imagen (opcional)</Label>
+            <div className="mt-1 flex items-center gap-3">
+              <div className="h-20 w-20 rounded-lg bg-muted overflow-hidden flex items-center justify-center">
+                {imagen
+                  ? <img src={imagen} alt="" className="w-full h-full object-cover" />
+                  : <ImageOff className="h-6 w-6 text-muted-foreground" />}
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+                  {imagen ? "Cambiar" : "Subir imagen"}
+                </Button>
+                {imagen && (
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setImagen("")}>
+                    Quitar
+                  </Button>
+                )}
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    compressImage(f, 800, "jpeg", 0.85)
+                      .then(setImagen)
+                      .catch(() => alert("Error al procesar imagen"));
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="pt">Título</Label>
+            <Input id="pt" value={titulo} onChange={(e) => setTitulo(e.target.value)} maxLength={80} />
+          </div>
+          <div>
+            <Label htmlFor="pd">Descripción ({descripcion.length}/200)</Label>
+            <Textarea id="pd" value={descripcion}
+              onChange={(e) => setDescripcion(e.target.value.slice(0, 200))} rows={3} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label htmlFor="pd-desde">Desde</Label>
+              <Input id="pd-desde" type="date" value={desde} onChange={(e) => setDesde(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="pd-hasta">Hasta</Label>
+              <Input id="pd-hasta" type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} />
+            </div>
+          </div>
+          <label className="flex items-center justify-between bg-muted rounded-lg p-3">
+            <span className="text-sm font-medium">Activa</span>
+            <Switch checked={activo} onCheckedChange={setActivo} />
+          </label>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => { onClose(); reset(null); }}>Cancelar</Button>
+          <Button
+            onClick={submit}
+            disabled={!titulo.trim() || !desde || !hasta}
+            className="bg-gradient-brand text-brand-foreground"
+          >
+            Guardar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
