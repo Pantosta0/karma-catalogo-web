@@ -169,7 +169,29 @@ export const DEFAULT_STATE: AppState = {
 const LS_KEY = "karma_app_v1";
 
 export function loadCachedState(): AppState | null {
-  return lsLoad();
+  const s = lsLoad();
+  return s ? normalizeState(s) : null;
+}
+
+/** Rellena campos nuevos que pueden faltar en estados guardados en versiones anteriores */
+function normalizeState(s: AppState): AppState {
+  return {
+    ...s,
+    codes: s.codes ?? [],
+    promos: s.promos ?? [],
+    config: {
+      ...s.config,
+      deliveryFee: s.config.deliveryFee ?? 5000,
+      seoDescription: s.config.seoDescription ?? "",
+      ogImage: s.config.ogImage ?? "",
+      schedule: s.config.schedule ?? DEFAULT_SCHEDULE,
+    },
+    productos: (s.productos ?? []).map((p) => ({
+      ...p,
+      descuento_pct: p.descuento_pct ?? 0,
+      descuento_hasta: p.descuento_hasta ?? "",
+    })),
+  };
 }
 
 function lsLoad(): AppState | null {
@@ -199,7 +221,7 @@ export async function loadStateFromSupabase(): Promise<AppState> {
 
     if (configRes.error || catRes.error || prodRes.error) {
       console.warn("[Supabase] Error cargando datos, usando localStorage:", configRes.error || catRes.error || prodRes.error);
-      const cached = lsLoad() ?? DEFAULT_STATE;
+      const cached = normalizeState(lsLoad() ?? DEFAULT_STATE);
       return { ...cached, adminSession: sessionStorage.getItem("karma_admin") === "1" };
     }
 
@@ -284,7 +306,7 @@ export async function loadStateFromSupabase(): Promise<AppState> {
     return state;
   } catch (err) {
     console.warn("[Supabase] Excepción al cargar, usando localStorage:", err);
-    const cached = lsLoad() ?? DEFAULT_STATE;
+    const cached = normalizeState(lsLoad() ?? DEFAULT_STATE);
     return { ...cached, adminSession: sessionStorage.getItem("karma_admin") === "1" };
   }
 }
