@@ -67,8 +67,6 @@ function calcCodeDiscount(code: PromoCode, base: number): number {
   return Math.min(code.descuento_valor, base);
 }
 
-const DELIVERY_FEE = 5_000; // COP — fijo, no afectado por descuentos
-
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
@@ -132,7 +130,8 @@ function CatalogPage() {
   const discountedSubtotal = cart.subtotal - productDiscountTotal;
   const codeDiscountAmount = appliedCode ? calcCodeDiscount(appliedCode, discountedSubtotal) : 0;
   // Domicilio se suma DESPUÉS de descuentos, no es afectado por códigos
-  const totalFinal = discountedSubtotal - codeDiscountAmount + DELIVERY_FEE;
+  const deliveryFee = state.config.deliveryFee ?? 5000;
+  const totalFinal = discountedSubtotal - codeDiscountAmount + deliveryFee;
 
   const logoUrl = state.config.logoSquare;
   const logoHeaderUrl = state.config.logoRect || state.config.logoSquare;
@@ -182,6 +181,7 @@ function CatalogPage() {
               productDiscountTotal={productDiscountTotal}
               appliedCode={appliedCode}
               codeDiscountAmount={codeDiscountAmount}
+              deliveryFee={deliveryFee}
               totalFinal={totalFinal}
               codes={state.codes}
               onApplyCode={setAppliedCode}
@@ -332,6 +332,7 @@ function CatalogPage() {
         productDiscountTotal={productDiscountTotal}
         appliedCode={appliedCode}
         codeDiscountAmount={codeDiscountAmount}
+        deliveryFee={deliveryFee}
         totalFinal={totalFinal}
         whatsapp={state.config.whatsapp}
         onSent={() => {
@@ -508,7 +509,7 @@ function ProductModal({
 }
 
 function CartSheet({
-  items, subtotal, productDiscountTotal, appliedCode, codeDiscountAmount, totalFinal,
+  items, subtotal, productDiscountTotal, appliedCode, codeDiscountAmount, deliveryFee, totalFinal,
   codes, onApplyCode, setQty, remove, onCheckout,
 }: {
   items: ReturnType<typeof useCart>["items"];
@@ -516,6 +517,7 @@ function CartSheet({
   productDiscountTotal: number;
   appliedCode: PromoCode | null;
   codeDiscountAmount: number;
+  deliveryFee: number;
   totalFinal: number;
   codes: PromoCode[];
   onApplyCode: (c: PromoCode | null) => void;
@@ -621,9 +623,11 @@ function CartSheet({
                 <span>Código {appliedCode.code}</span><span>-{formatCOP(codeDiscountAmount)}</span>
               </div>
             )}
-            <div className="flex justify-between text-muted-foreground">
-              <span>Domicilio</span><span>{formatCOP(DELIVERY_FEE)}</span>
-            </div>
+            {deliveryFee > 0 && (
+              <div className="flex justify-between text-muted-foreground">
+                <span>Domicilio</span><span>{formatCOP(deliveryFee)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-lg font-bold pt-1 border-t border-border">
               <span>Total</span>
               <span className="text-primary font-display">{formatCOP(totalFinal)}</span>
@@ -641,7 +645,7 @@ function CartSheet({
 
 function CheckoutModal({
   open, onOpenChange, items, subtotal, productDiscountTotal,
-  appliedCode, codeDiscountAmount, totalFinal, whatsapp, onSent,
+  appliedCode, codeDiscountAmount, deliveryFee, totalFinal, whatsapp, onSent,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -650,6 +654,7 @@ function CheckoutModal({
   productDiscountTotal: number;
   appliedCode: PromoCode | null;
   codeDiscountAmount: number;
+  deliveryFee: number;
   totalFinal: number;
   whatsapp: string;
   onSent: () => void;
@@ -671,7 +676,7 @@ function CheckoutModal({
     const discLines = [
       productDiscountTotal > 0 ? `\n- Descuento productos: -${formatCOP(productDiscountTotal)}` : "",
       appliedCode ? `\n- Código ${appliedCode.code}: -${formatCOP(codeDiscountAmount)}` : "",
-      `\n- Domicilio: ${formatCOP(DELIVERY_FEE)}`,
+      deliveryFee > 0 ? `\n- Domicilio: ${formatCOP(deliveryFee)}` : "",
     ].join("");
     const msg = `Hola! quisiera hacer un pedido:
 

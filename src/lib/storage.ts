@@ -46,6 +46,7 @@ export type BusinessConfig = {
   logoRect: string;       // logo rectangular — header
   seoDescription: string; // meta description y og:description
   ogImage: string;         // URL absoluta de imagen para og:image (redes sociales)
+  deliveryFee: number;     // costo de domicilio en COP
   schedule: DaySchedule[]; // 7 entradas [0=Dom, 1=Lun, ..., 6=Sáb]
 };
 
@@ -96,6 +97,7 @@ export const DEFAULT_STATE: AppState = {
     logoRect: "",
     seoDescription: "Restaurante de comida rápida y asados. Pide directo por WhatsApp.",
     ogImage: "",
+    deliveryFee: 5000,
     schedule: DEFAULT_SCHEDULE,
   },
   categorias: DEFAULT_CATEGORIES,
@@ -206,6 +208,7 @@ export async function loadStateFromSupabase(): Promise<AppState> {
       logo_square: string; logo_rect: string;
       seo_description: string;
       og_image: string;
+      delivery_fee: number | null;
       schedule: DaySchedule[] | null;
       admin_user: string; admin_pass: string;
     };
@@ -261,6 +264,7 @@ export async function loadStateFromSupabase(): Promise<AppState> {
         logoRect: raw.logo_rect ?? "",
         seoDescription: raw.seo_description ?? "",
         ogImage: raw.og_image ?? "",
+        deliveryFee: raw.delivery_fee ?? cached?.config?.deliveryFee ?? 5000,
         schedule: Array.isArray(raw.schedule) && raw.schedule.length === 7
           ? raw.schedule
           : Array.isArray(cached?.config?.schedule) && cached.config.schedule.length === 7
@@ -300,6 +304,7 @@ export async function saveStateToSupabase(state: AppState): Promise<void> {
       logo_rect: state.config.logoRect,
       seo_description: state.config.seoDescription,
       og_image: state.config.ogImage,
+      delivery_fee: state.config.deliveryFee,
       schedule: state.config.schedule,
       admin_user: state.adminAuth.user,
       admin_pass: state.adminAuth.pass,

@@ -580,6 +580,7 @@ function BusinessTab() {
   const { state, update } = useAppState();
   const [nombre, setNombre] = useState(state.config.nombre);
   const [whatsapp, setWhatsapp] = useState(state.config.whatsapp);
+  const [deliveryFee, setDeliveryFee] = useState<string>(state.config.deliveryFee?.toString() ?? "5000");
   const [logoSquare, setLogoSquare] = useState(state.config.logoSquare);
   const [logoRect, setLogoRect] = useState(state.config.logoRect);
   const [seoDescription, setSeoDescription] = useState(state.config.seoDescription);
@@ -652,6 +653,7 @@ function BusinessTab() {
         logoRect,
         seoDescription: seoDescription.trim(),
         ogImage: ogImage.trim(),
+        deliveryFee: Math.max(0, parseInt(deliveryFee, 10) || 0),
         schedule,
       },
       ...(newHashedPass ? { adminAuth: { ...s.adminAuth, pass: newHashedPass } } : {}),
@@ -729,6 +731,21 @@ function BusinessTab() {
         <p className="text-xs text-muted-foreground mt-1">
           Ej: 573001112233 (Colombia +57). Aquí llegarán los pedidos.
         </p>
+      </div>
+      <div>
+        <Label htmlFor="delivery-fee">Costo de domicilio (COP)</Label>
+        <div className="flex items-center gap-2 mt-1">
+          <Input
+            id="delivery-fee"
+            type="number"
+            min={0}
+            value={deliveryFee}
+            onChange={(e) => setDeliveryFee(e.target.value)}
+            className="w-36"
+          />
+          <span className="text-sm text-muted-foreground">COP</span>
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">Se suma al total después de aplicar descuentos. Pon 0 si el domicilio es gratis.</p>
       </div>
 
       {/* ── Horarios ────────────────────────────────────────────────────────── */}
