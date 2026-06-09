@@ -13,6 +13,23 @@ export type Product = {
   categorias: string[];
   foto: string; // base64 data url o url
   disponible: boolean;
+  descuento_pct: number;   // 0-100 %, 0 = sin descuento
+  descuento_hasta: string; // "YYYY-MM-DD" o "" si no vence
+};
+
+export type PromoCode = {
+  id: string;
+  code: string;              // ej: "KARMA20" (se compara en mayúsculas)
+  descripcion: string;
+  descuento_tipo: "porcentaje" | "fijo"; // % sobre el subtotal o monto fijo
+  descuento_valor: number;
+  limite_usos: boolean;
+  usos_maximos: number;
+  usos_actuales: number;
+  limite_tiempo: boolean;
+  desde: string;             // "YYYY-MM-DD"
+  hasta: string;             // "YYYY-MM-DD"
+  activo: boolean;
 };
 
 // Horario de un día: abierto/cerrado + franja horaria
@@ -47,6 +64,7 @@ export type AppState = {
   categorias: Category[];
   productos: Product[];
   promos: Promo[];
+  codes: PromoCode[];
   adminAuth: { user: string; pass: string };
   adminSession: boolean;
 };
@@ -90,6 +108,8 @@ export const DEFAULT_STATE: AppState = {
       categorias: ["hamburguesas"],
       foto: "",
       disponible: true,
+      descuento_pct: 0,
+      descuento_hasta: "",
     },
     {
       id: "p2",
@@ -99,6 +119,8 @@ export const DEFAULT_STATE: AppState = {
       categorias: ["hamburguesas"],
       foto: "",
       disponible: true,
+      descuento_pct: 0,
+      descuento_hasta: "",
     },
     {
       id: "p3",
@@ -108,6 +130,8 @@ export const DEFAULT_STATE: AppState = {
       categorias: ["asados"],
       foto: "",
       disponible: true,
+      descuento_pct: 0,
+      descuento_hasta: "",
     },
     {
       id: "p4",
@@ -117,6 +141,8 @@ export const DEFAULT_STATE: AppState = {
       categorias: ["combos", "hamburguesas"],
       foto: "",
       disponible: true,
+      descuento_pct: 0,
+      descuento_hasta: "",
     },
     {
       id: "p5",
@@ -126,9 +152,12 @@ export const DEFAULT_STATE: AppState = {
       categorias: ["bebidas"],
       foto: "",
       disponible: true,
+      descuento_pct: 0,
+      descuento_hasta: "",
     },
   ],
   promos: [],
+  codes: [],
   adminAuth: { user: "kevin", pass: "Karma_2026_!" },
   adminSession: false,
 };
@@ -190,6 +219,7 @@ export async function loadStateFromSupabase(): Promise<AppState> {
       id: string; nombre: string; descripcion: string; precio: number;
       categorias: string[] | null; categoria_id: string | null;
       foto: string; disponible: boolean;
+      descuento_pct?: number; descuento_hasta?: string;
     }) => ({
       id: p.id,
       nombre: p.nombre,
@@ -200,6 +230,8 @@ export async function loadStateFromSupabase(): Promise<AppState> {
         : p.categoria_id ? [p.categoria_id] : [],
       foto: p.foto ?? "",
       disponible: p.disponible,
+      descuento_pct: p.descuento_pct ?? 0,
+      descuento_hasta: p.descuento_hasta ?? "",
     }));
 
     // Promos — tabla opcional, falla silenciosamente si no existe todavía
@@ -207,6 +239,13 @@ export async function loadStateFromSupabase(): Promise<AppState> {
     try {
       const promoRes = await supabase.from("promos").select("*");
       if (!promoRes.error && promoRes.data) promos = promoRes.data as Promo[];
+    } catch { /* tabla aún no creada */ }
+
+    // Códigos promo — tabla opcional
+    let codes: PromoCode[] = [];
+    try {
+      const codesRes = await supabase.from("codigos").select("*");
+      if (!codesRes.error && codesRes.data) codes = codesRes.data as PromoCode[];
     } catch { /* tabla aún no creada */ }
 
     // Usamos la caché de localStorage como segundo fallback para campos que
@@ -231,6 +270,7 @@ export async function loadStateFromSupabase(): Promise<AppState> {
       categorias,
       productos,
       promos,
+      codes,
       adminAuth: { user: raw.admin_user, pass: raw.admin_pass },
       // Restaurar sesión desde sessionStorage (persiste en el tab, no en DB)
       adminSession: sessionStorage.getItem("karma_admin") === "1",
@@ -295,6 +335,8 @@ export async function saveStateToSupabase(state: AppState): Promise<void> {
           categorias: p.categorias,
           foto: p.foto,
           disponible: p.disponible,
+          descuento_pct: p.descuento_pct ?? 0,
+          descuento_hasta: p.descuento_hasta ?? "",
         }))
       );
     }
@@ -306,6 +348,17 @@ export async function saveStateToSupabase(state: AppState): Promise<void> {
         await supabase.from("promos").upsert(state.promos);
       } else {
         await supabase.from("promos").delete().neq("id", "__none__");
+      }
+    } catch { /* tabla aún no creada */ }
+
+    // Sincronizar códigos promo
+    try {
+      const codeIds = state.codes.map((c) => c.id);
+      if (codeIds.length > 0) {
+        await supabase.from("codigos").delete().not("id", "in", `(${codeIds.map((id) => `'${id}'`).join(",")})`);
+        await supabase.from("codigos").upsert(state.codes);
+      } else {
+        await supabase.from("codigos").delete().neq("id", "__none__");
       }
     } catch { /* tabla aún no creada */ }
   } catch (err) {

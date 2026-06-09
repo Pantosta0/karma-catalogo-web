@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState, useEffect, useRef, forwardRef } from "react";
 import { useAppState } from "@/lib/app-store";
 import { useCart, formatCOP } from "@/lib/cart";
-import type { Product, DaySchedule } from "@/lib/storage";
+import type { Product, DaySchedule, PromoCode } from "@/lib/storage";
 import {
   Dialog,
   DialogContent,
@@ -32,6 +32,41 @@ function getIsOpen(schedule: DaySchedule[] | undefined): boolean | null {
   return mins >= fh * 60 + fm && mins <= th * 60 + tm;
 }
 
+// Precio efectivo de un producto considerando su descuento por tiempo limitado
+function getDiscountedPrice(p: Product): number {
+  if (!p.descuento_pct || p.descuento_pct <= 0) return p.precio;
+  if (p.descuento_hasta) {
+    const today = new Date().toISOString().slice(0, 10);
+    if (today > p.descuento_hasta) return p.precio;
+  }
+  return Math.round(p.precio * (1 - p.descuento_pct / 100));
+}
+function isDiscounted(p: Product): boolean {
+  return getDiscountedPrice(p) < p.precio;
+}
+
+// Valida un código promo y devuelve el objeto o un mensaje de error
+function validateCode(
+  input: string,
+  codes: PromoCode[],
+): { ok: true; code: PromoCode } | { ok: false; error: string } {
+  const today = new Date().toISOString().slice(0, 10);
+  const found = codes.find((c) => c.code === input.toUpperCase().trim());
+  if (!found) return { ok: false, error: "Código no válido" };
+  if (!found.activo) return { ok: false, error: "Este código no está activo" };
+  if (found.limite_tiempo && (today < found.desde || today > found.hasta))
+    return { ok: false, error: "Código fuera de su período de validez" };
+  if (found.limite_usos && found.usos_actuales >= found.usos_maximos)
+    return { ok: false, error: "Este código ya agotó sus usos disponibles" };
+  return { ok: true, code: found };
+}
+
+function calcCodeDiscount(code: PromoCode, base: number): number {
+  if (code.descuento_tipo === "porcentaje")
+    return Math.round(base * code.descuento_valor / 100);
+  return Math.min(code.descuento_valor, base);
+}
+
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
@@ -43,7 +78,7 @@ export const Route = createFileRoute("/")({
 });
 
 function CatalogPage() {
-  const { state, loading } = useAppState();
+  const { state, loading, update } = useAppState();
   const cart = useCart();
   const [activeCat, setActiveCat] = useState<string>("todos");
   const [selected, setSelected] = useState<Product | null>(null);
@@ -51,6 +86,7 @@ function CatalogPage() {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [promoOpen, setPromoOpen] = useState(false);
   const [activePromo, setActivePromo] = useState<(typeof state.promos)[0] | null>(null);
+  const [appliedCode, setAppliedCode] = useState<PromoCode | null>(null);
 
   const isOpen = getIsOpen(state.config.schedule);
   const pillRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
@@ -85,6 +121,15 @@ function CatalogPage() {
     () => state.productos.filter((p) => p.disponible && (activeCat === "todos" || p.categorias.includes(activeCat))),
     [state.productos, activeCat],
   );
+
+  // Subtotal ajustado con descuentos por producto
+  const productDiscountTotal = cart.items.reduce(
+    (acc, i) => acc + (i.product.precio - getDiscountedPrice(i.product)) * i.cantidad,
+    0,
+  );
+  const discountedSubtotal = cart.subtotal - productDiscountTotal;
+  const codeDiscountAmount = appliedCode ? calcCodeDiscount(appliedCode, discountedSubtotal) : 0;
+  const totalFinal = discountedSubtotal - codeDiscountAmount;
 
   const logoUrl = state.config.logoSquare;
   const logoHeaderUrl = state.config.logoRect || state.config.logoSquare;
@@ -131,6 +176,12 @@ function CatalogPage() {
             <CartSheet
               items={cart.items}
               subtotal={cart.subtotal}
+              productDiscountTotal={productDiscountTotal}
+              appliedCode={appliedCode}
+              codeDiscountAmount={codeDiscountAmount}
+              totalFinal={totalFinal}
+              codes={state.codes}
+              onApplyCode={setAppliedCode}
               setQty={cart.setQty}
               remove={cart.remove}
               onCheckout={() => {
@@ -211,7 +262,7 @@ function CatalogPage() {
           <span className="flex items-center gap-2">
             <ShoppingCart className="h-5 w-5" /> {cart.count} {cart.count === 1 ? "ítem" : "ítems"}
           </span>
-          <span>{formatCOP(cart.subtotal)}</span>
+          <span>{formatCOP(totalFinal)}</span>
         </button>
       )}
 
@@ -275,8 +326,22 @@ function CatalogPage() {
         onOpenChange={setCheckoutOpen}
         items={cart.items}
         subtotal={cart.subtotal}
+        productDiscountTotal={productDiscountTotal}
+        appliedCode={appliedCode}
+        codeDiscountAmount={codeDiscountAmount}
+        totalFinal={totalFinal}
         whatsapp={state.config.whatsapp}
         onSent={() => {
+          // Incrementar usos del código si fue aplicado
+          if (appliedCode) {
+            update((s) => ({
+              ...s,
+              codes: s.codes.map((c) =>
+                c.id === appliedCode.id ? { ...c, usos_actuales: c.usos_actuales + 1 } : c
+              ),
+            }));
+            setAppliedCode(null);
+          }
           cart.clear();
           setCheckoutOpen(false);
         }}
@@ -332,7 +397,17 @@ function ProductCard({
       </button>
       <div className="p-3 pb-12">
         <h3 className="font-semibold text-sm sm:text-base leading-tight line-clamp-2">{product.nombre}</h3>
-        <p className="text-primary font-display font-bold mt-1">{formatCOP(product.precio)}</p>
+        {isDiscounted(product) ? (
+          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+            <p className="text-primary font-display font-bold">{formatCOP(getDiscountedPrice(product))}</p>
+            <p className="text-muted-foreground text-xs line-through">{formatCOP(product.precio)}</p>
+            <span className="text-[10px] font-bold bg-primary/15 text-primary px-1.5 py-0.5 rounded-full">
+              -{product.descuento_pct}%
+            </span>
+          </div>
+        ) : (
+          <p className="text-primary font-display font-bold mt-1">{formatCOP(product.precio)}</p>
+        )}
       </div>
       <button
         onClick={onAdd}
@@ -385,9 +460,16 @@ function ProductModal({
                 </DialogDescription>
               </DialogHeader>
               <div className="mt-4 flex items-center justify-between">
-                <span className="text-2xl font-display font-bold text-primary">
-                  {formatCOP(product.precio * qty)}
-                </span>
+                <div>
+                  <span className="text-2xl font-display font-bold text-primary">
+                    {formatCOP(getDiscountedPrice(product) * qty)}
+                  </span>
+                  {isDiscounted(product) && (
+                    <p className="text-xs text-muted-foreground line-through">
+                      {formatCOP(product.precio * qty)}
+                    </p>
+                  )}
+                </div>
                 <div className="flex items-center gap-2 bg-muted rounded-full p-1">
                   <button
                     onClick={() => setQty(Math.max(1, qty - 1))}
@@ -423,18 +505,31 @@ function ProductModal({
 }
 
 function CartSheet({
-  items,
-  subtotal,
-  setQty,
-  remove,
-  onCheckout,
+  items, subtotal, productDiscountTotal, appliedCode, codeDiscountAmount, totalFinal,
+  codes, onApplyCode, setQty, remove, onCheckout,
 }: {
   items: ReturnType<typeof useCart>["items"];
   subtotal: number;
+  productDiscountTotal: number;
+  appliedCode: PromoCode | null;
+  codeDiscountAmount: number;
+  totalFinal: number;
+  codes: PromoCode[];
+  onApplyCode: (c: PromoCode | null) => void;
   setQty: (id: string, q: number) => void;
   remove: (id: string) => void;
   onCheckout: () => void;
 }) {
+  const [codeInput, setCodeInput] = useState("");
+  const [codeError, setCodeError] = useState("");
+
+  const applyCode = () => {
+    if (!codeInput.trim()) return;
+    const result = validateCode(codeInput, codes);
+    if (result.ok) { onApplyCode(result.code); setCodeError(""); setCodeInput(""); }
+    else setCodeError(result.error);
+  };
+
   return (
     <SheetContent side="right" className="w-full sm:max-w-md flex flex-col">
       <SheetHeader>
@@ -444,52 +539,93 @@ function CartSheet({
         {items.length === 0 ? (
           <p className="text-muted-foreground text-center py-10">El carrito está vacío.</p>
         ) : (
-          items.map((i) => (
-            <div key={i.product.id} className="flex gap-3 bg-muted/50 rounded-xl p-2">
-              <div className="h-16 w-16 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                {i.product.foto ? (
-                  <img src={i.product.foto} alt={i.product.nombre} className="w-full h-full object-cover" />
-                ) : null}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm line-clamp-1">{i.product.nombre}</p>
-                <p className="text-primary font-bold text-sm">{formatCOP(i.product.precio)}</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <button
-                    onClick={() => setQty(i.product.id, i.cantidad - 1)}
-                    className="h-7 w-7 rounded-full bg-card border border-border flex items-center justify-center"
-                  >
-                    <Minus className="h-3 w-3" />
-                  </button>
-                  <span className="text-sm font-semibold w-5 text-center">{i.cantidad}</span>
-                  <button
-                    onClick={() => setQty(i.product.id, i.cantidad + 1)}
-                    className="h-7 w-7 rounded-full bg-card border border-border flex items-center justify-center"
-                  >
-                    <Plus className="h-3 w-3" />
-                  </button>
-                  <button
-                    onClick={() => remove(i.product.id)}
-                    className="ml-auto p-1 text-destructive"
-                    aria-label="Eliminar"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+          items.map((i) => {
+            const discounted = isDiscounted(i.product);
+            return (
+              <div key={i.product.id} className="flex gap-3 bg-muted/50 rounded-xl p-2">
+                <div className="h-16 w-16 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                  {i.product.foto ? (
+                    <img src={i.product.foto} alt={i.product.nombre} className="w-full h-full object-cover" />
+                  ) : null}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm line-clamp-1">{i.product.nombre}</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-primary font-bold text-sm">{formatCOP(getDiscountedPrice(i.product) * i.cantidad)}</p>
+                    {discounted && <p className="text-muted-foreground text-xs line-through">{formatCOP(i.product.precio * i.cantidad)}</p>}
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <button onClick={() => setQty(i.product.id, i.cantidad - 1)}
+                      className="h-7 w-7 rounded-full bg-card border border-border flex items-center justify-center">
+                      <Minus className="h-3 w-3" />
+                    </button>
+                    <span className="text-sm font-semibold w-5 text-center">{i.cantidad}</span>
+                    <button onClick={() => setQty(i.product.id, i.cantidad + 1)}
+                      className="h-7 w-7 rounded-full bg-card border border-border flex items-center justify-center">
+                      <Plus className="h-3 w-3" />
+                    </button>
+                    <button onClick={() => remove(i.product.id)}
+                      className="ml-auto p-1 text-destructive" aria-label="Eliminar">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
       {items.length > 0 && (
         <div className="border-t border-border pt-4 space-y-3">
-          <div className="flex justify-between text-lg">
-            <span className="font-semibold">Subtotal</span>
-            <span className="font-display font-bold text-primary">{formatCOP(subtotal)}</span>
+          {/* Código promo */}
+          <div>
+            {appliedCode ? (
+              <div className="flex items-center justify-between bg-green-500/10 border border-green-500/30 rounded-lg px-3 py-2">
+                <div>
+                  <p className="text-xs font-bold text-green-400">Código: {appliedCode.code}</p>
+                  <p className="text-xs text-muted-foreground">
+                    -{appliedCode.descuento_tipo === "porcentaje" ? `${appliedCode.descuento_valor}%` : formatCOP(appliedCode.descuento_valor)} del subtotal
+                  </p>
+                </div>
+                <button onClick={() => onApplyCode(null)} className="text-muted-foreground hover:text-foreground p-1">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <Input placeholder="Código promo" value={codeInput}
+                  onChange={(e) => { setCodeInput(e.target.value.toUpperCase()); setCodeError(""); }}
+                  onKeyDown={(e) => e.key === "Enter" && applyCode()}
+                  className="font-display tracking-widest uppercase text-sm" />
+                <Button variant="outline" size="sm" onClick={applyCode} className="shrink-0">Aplicar</Button>
+              </div>
+            )}
+            {codeError && <p className="text-xs text-destructive mt-1">{codeError}</p>}
           </div>
+
+          {/* Desglose */}
+          <div className="space-y-1 text-sm">
+            <div className="flex justify-between text-muted-foreground">
+              <span>Subtotal</span><span>{formatCOP(subtotal)}</span>
+            </div>
+            {productDiscountTotal > 0 && (
+              <div className="flex justify-between text-green-400">
+                <span>Descuentos productos</span><span>-{formatCOP(productDiscountTotal)}</span>
+              </div>
+            )}
+            {appliedCode && codeDiscountAmount > 0 && (
+              <div className="flex justify-between text-green-400">
+                <span>Código {appliedCode.code}</span><span>-{formatCOP(codeDiscountAmount)}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-lg font-bold pt-1 border-t border-border">
+              <span>Total</span>
+              <span className="text-primary font-display">{formatCOP(totalFinal)}</span>
+            </div>
+          </div>
+
           <Button onClick={onCheckout} size="lg" className="w-full bg-gradient-brand text-brand-foreground hover:opacity-95">
-            <Send className="h-4 w-4 mr-2" />
-            Enviar pedido por WhatsApp
+            <Send className="h-4 w-4 mr-2" />Enviar pedido por WhatsApp
           </Button>
         </div>
       )}
@@ -498,17 +634,17 @@ function CartSheet({
 }
 
 function CheckoutModal({
-  open,
-  onOpenChange,
-  items,
-  subtotal,
-  whatsapp,
-  onSent,
+  open, onOpenChange, items, subtotal, productDiscountTotal,
+  appliedCode, codeDiscountAmount, totalFinal, whatsapp, onSent,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   items: ReturnType<typeof useCart>["items"];
   subtotal: number;
+  productDiscountTotal: number;
+  appliedCode: PromoCode | null;
+  codeDiscountAmount: number;
+  totalFinal: number;
   whatsapp: string;
   onSent: () => void;
 }) {
@@ -520,8 +656,16 @@ function CheckoutModal({
   const enviar = () => {
     if (!nombre.trim() || !direccion.trim() || !telefono.trim()) return;
     const detalle = items
-      .map((i) => `   - ${i.cantidad}x ${i.product.nombre} (${formatCOP(i.product.precio * i.cantidad)})`)
+      .map((i) => {
+        const dp = getDiscountedPrice(i.product);
+        const disc = isDiscounted(i.product) ? ` (antes ${formatCOP(i.product.precio)})` : "";
+        return `   - ${i.cantidad}x ${i.product.nombre} — ${formatCOP(dp * i.cantidad)}${disc}`;
+      })
       .join("\n");
+    const discLines = [
+      productDiscountTotal > 0 ? `\n- Descuento productos: -${formatCOP(productDiscountTotal)}` : "",
+      appliedCode ? `\n- Código ${appliedCode.code}: -${formatCOP(codeDiscountAmount)}` : "",
+    ].join("");
     const msg = `Hola! quisiera hacer un pedido:
 
 - Nombre completo: ${nombre}
@@ -534,8 +678,8 @@ ${detalle}
 - Número de contacto: ${telefono}
 
 - Medio de pago: ${pago}
-
-Total: ${formatCOP(subtotal)}`;
+${discLines}
+Total: ${formatCOP(totalFinal)}`;
     const url = `https://wa.me/${whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`;
     window.open(url, "_blank");
     onSent();

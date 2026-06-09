@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
 import { useAppState } from "@/lib/app-store";
-import { uid, DEFAULT_SCHEDULE, type Product, type Category, type DaySchedule, type Promo } from "@/lib/storage";
+import { uid, DEFAULT_SCHEDULE, type Product, type Category, type DaySchedule, type Promo, type PromoCode } from "@/lib/storage";
 import { compressImage } from "@/lib/image";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { hashPassword, verifyPassword, isHashed } from "@/lib/crypto";
@@ -29,7 +29,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Pencil, Trash2, LogOut, Store, Tag, ImageOff, ArrowLeft, X, Megaphone, Clock } from "lucide-react";
+import { Plus, Pencil, Trash2, LogOut, Store, Tag, ImageOff, ArrowLeft, X, Megaphone, Clock, Ticket, Hash } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -302,6 +302,8 @@ function ProductFormDialog({
   const [categorias, setCategorias] = useState<string[]>(product?.categorias ?? []);
   const [foto, setFoto] = useState(product?.foto ?? "");
   const [disponible, setDisponible] = useState(product?.disponible ?? true);
+  const [descuentoPct, setDescuentoPct] = useState<string>(product?.descuento_pct?.toString() ?? "0");
+  const [descuentoHasta, setDescuentoHasta] = useState(product?.descuento_hasta ?? "");
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Sincronizar form cuando el diálogo abre o cambia el producto seleccionado
@@ -313,6 +315,8 @@ function ProductFormDialog({
       setCategorias(product?.categorias ?? []);
       setFoto(product?.foto ?? "");
       setDisponible(product?.disponible ?? true);
+      setDescuentoPct(product?.descuento_pct?.toString() ?? "0");
+      setDescuentoHasta(product?.descuento_hasta ?? "");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, product?.id]);
@@ -334,6 +338,7 @@ function ProductFormDialog({
   const submit = () => {
     const p = parseInt(precio, 10);
     if (!nombre.trim() || categorias.length === 0 || isNaN(p) || p < 0) return;
+    const pct = Math.min(100, Math.max(0, parseInt(descuentoPct, 10) || 0));
     onSave({
       id: product?.id ?? uid(),
       nombre: nombre.trim(),
@@ -342,6 +347,8 @@ function ProductFormDialog({
       categorias,
       foto,
       disponible,
+      descuento_pct: pct,
+      descuento_hasta: descuentoHasta,
     });
     onClose();
     setNombre("");
@@ -350,6 +357,8 @@ function ProductFormDialog({
     setCategorias([]);
     setFoto("");
     setDisponible(true);
+    setDescuentoPct("0");
+    setDescuentoHasta("");
   };
 
   return (
@@ -452,6 +461,48 @@ function ProductFormDialog({
             <span className="text-sm font-medium">Disponible en el catálogo</span>
             <Switch checked={disponible} onCheckedChange={setDisponible} />
           </label>
+
+          {/* Descuento por tiempo limitado */}
+          <div className="pt-3 border-t border-border space-y-2">
+            <p className="text-sm font-semibold flex items-center gap-1.5">
+              <Ticket className="h-4 w-4 text-primary" /> Descuento (opcional)
+            </p>
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <Label htmlFor="prod-desc-pct">Descuento %</Label>
+                <div className="flex items-center gap-1 mt-1">
+                  <Input
+                    id="prod-desc-pct"
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={descuentoPct}
+                    onChange={(e) => setDescuentoPct(e.target.value)}
+                    className="w-20"
+                  />
+                  <span className="text-sm text-muted-foreground">%</span>
+                </div>
+              </div>
+              <div className="flex-1">
+                <Label htmlFor="prod-desc-hasta">Válido hasta <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+                <Input
+                  id="prod-desc-hasta"
+                  type="date"
+                  value={descuentoHasta}
+                  onChange={(e) => setDescuentoHasta(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+            {parseInt(descuentoPct, 10) > 0 && (
+              <p className="text-xs text-primary">
+                Precio con descuento:{" "}
+                {new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 })
+                  .format(Math.round((parseInt(precio, 10) || 0) * (1 - (parseInt(descuentoPct, 10) || 0) / 100)))}
+                {descuentoHasta ? ` hasta ${descuentoHasta}` : " (sin fecha límite)"}
+              </p>
+            )}
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
@@ -850,16 +901,38 @@ function BusinessTab() {
 /* -------------------- Promos -------------------- */
 
 function PromosTab() {
+  const [subTab, setSubTab] = useState<"popups" | "codigos">("popups");
+  return (
+    <div className="space-y-4 max-w-2xl">
+      <div className="flex gap-2">
+        {(["popups", "codigos"] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => setSubTab(t)}
+            className={`px-4 py-2 rounded-full text-sm font-semibold transition ${
+              subTab === t ? "bg-primary text-primary-foreground" : "bg-card border border-border text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {t === "popups" ? "Popups" : "Códigos promo"}
+          </button>
+        ))}
+      </div>
+      {subTab === "popups" ? <PopupsSubTab /> : <CodesSubTab />}
+    </div>
+  );
+}
+
+function PopupsSubTab() {
   const { state, update } = useAppState();
   const [editing, setEditing] = useState<Promo | null>(null);
   const [creating, setCreating] = useState(false);
   const [toDelete, setToDelete] = useState<Promo | null>(null);
 
   return (
-    <div className="space-y-4 max-w-2xl">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="font-display text-lg font-bold">Promociones y anuncios</h2>
+          <h2 className="font-display text-lg font-bold">Popups promocionales</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
             Se muestran como popup al entrar al catálogo, una vez por sesión.
           </p>
@@ -1069,6 +1142,307 @@ function PromoFormDialog({
             disabled={!titulo.trim() || !desde || !hasta}
             className="bg-gradient-brand text-brand-foreground"
           >
+            Guardar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* -------------------- Códigos promo -------------------- */
+
+function CodesSubTab() {
+  const { state, update } = useAppState();
+  const [editing, setEditing] = useState<PromoCode | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [toDelete, setToDelete] = useState<PromoCode | null>(null);
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  const codeStatus = (c: PromoCode) => {
+    if (!c.activo) return { label: "Inactivo", cls: "bg-muted text-muted-foreground" };
+    if (c.limite_tiempo && (today < c.desde || today > c.hasta))
+      return { label: "Fuera de rango", cls: "bg-yellow-500/20 text-yellow-400" };
+    if (c.limite_usos && c.usos_actuales >= c.usos_maximos)
+      return { label: "Agotado", cls: "bg-red-500/20 text-red-400" };
+    return { label: "Activo", cls: "bg-green-500/20 text-green-400" };
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="font-display text-lg font-bold">Códigos promocionales</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Códigos de descuento que los clientes ingresan en el carrito.
+          </p>
+        </div>
+        <Button onClick={() => setCreating(true)} className="bg-gradient-brand text-brand-foreground">
+          <Plus className="h-4 w-4 mr-1" /> Nuevo
+        </Button>
+      </div>
+
+      {state.codes.length === 0 ? (
+        <div className="text-center py-16 text-muted-foreground border border-dashed border-border rounded-xl">
+          No hay códigos. Crea uno para empezar.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {state.codes.map((c) => {
+            const status = codeStatus(c);
+            return (
+              <div key={c.id} className="bg-card border border-border rounded-xl p-4 flex gap-3">
+                <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-primary/10 shrink-0">
+                  <Hash className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-display font-bold tracking-widest text-primary">{c.code}</span>
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${status.cls}`}>{status.label}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {c.descuento_tipo === "porcentaje" ? `${c.descuento_valor}% de descuento` : `$${c.descuento_valor.toLocaleString("es-CO")} de descuento`}
+                    {c.descripcion ? ` · ${c.descripcion}` : ""}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {c.limite_usos && `${c.usos_actuales}/${c.usos_maximos} usos`}
+                    {c.limite_usos && c.limite_tiempo && " · "}
+                    {c.limite_tiempo && `${c.desde} → ${c.hasta}`}
+                    {!c.limite_usos && !c.limite_tiempo && "Sin límites"}
+                  </p>
+                </div>
+                <div className="flex flex-col gap-1 shrink-0">
+                  <Button size="icon" variant="ghost" onClick={() => setEditing(c)}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive"
+                    onClick={() => setToDelete(c)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <CodeFormDialog
+        open={creating || !!editing}
+        code={editing}
+        onClose={() => { setCreating(false); setEditing(null); }}
+        onSave={(code) => {
+          update((s) => ({
+            ...s,
+            codes: editing
+              ? s.codes.map((x) => (x.id === code.id ? code : x))
+              : [...s.codes, code],
+          }));
+          setCreating(false);
+          setEditing(null);
+        }}
+      />
+
+      <AlertDialog open={!!toDelete} onOpenChange={(o) => !o && setToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar código?</AlertDialogTitle>
+            <AlertDialogDescription>Se eliminará el código "{toDelete?.code}".</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground"
+              onClick={() => {
+                if (toDelete) {
+                  update((s) => ({ ...s, codes: s.codes.filter((x) => x.id !== toDelete.id) }));
+                  setToDelete(null);
+                }
+              }}>
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+function CodeFormDialog({
+  open, code, onClose, onSave,
+}: {
+  open: boolean;
+  code: PromoCode | null;
+  onClose: () => void;
+  onSave: (c: PromoCode) => void;
+}) {
+  const [codeStr, setCodeStr] = useState(code?.code ?? "");
+  const [descripcion, setDescripcion] = useState(code?.descripcion ?? "");
+  const [descTipo, setDescTipo] = useState<"porcentaje" | "fijo">(code?.descuento_tipo ?? "porcentaje");
+  const [descValor, setDescValor] = useState<string>(code?.descuento_valor?.toString() ?? "");
+  const [limUsos, setLimUsos] = useState(code?.limite_usos ?? false);
+  const [usosMax, setUsosMax] = useState<string>(code?.usos_maximos?.toString() ?? "100");
+  const [usosAct, setUsosAct] = useState<number>(code?.usos_actuales ?? 0);
+  const [limTiempo, setLimTiempo] = useState(code?.limite_tiempo ?? false);
+  const [desde, setDesde] = useState(code?.desde ?? "");
+  const [hasta, setHasta] = useState(code?.hasta ?? "");
+  const [activo, setActivo] = useState(code?.activo ?? true);
+
+  useEffect(() => {
+    if (open) {
+      setCodeStr(code?.code ?? "");
+      setDescripcion(code?.descripcion ?? "");
+      setDescTipo(code?.descuento_tipo ?? "porcentaje");
+      setDescValor(code?.descuento_valor?.toString() ?? "");
+      setLimUsos(code?.limite_usos ?? false);
+      setUsosMax(code?.usos_maximos?.toString() ?? "100");
+      setUsosAct(code?.usos_actuales ?? 0);
+      setLimTiempo(code?.limite_tiempo ?? false);
+      setDesde(code?.desde ?? "");
+      setHasta(code?.hasta ?? "");
+      setActivo(code?.activo ?? true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, code?.id]);
+
+  const submit = () => {
+    const valor = parseFloat(descValor);
+    if (!codeStr.trim() || isNaN(valor) || valor <= 0) return;
+    if (limUsos && (!usosMax || parseInt(usosMax, 10) <= 0)) return;
+    if (limTiempo && (!desde || !hasta)) return;
+    onSave({
+      id: code?.id ?? uid(),
+      code: codeStr.toUpperCase().trim().replace(/\s+/g, ""),
+      descripcion: descripcion.trim(),
+      descuento_tipo: descTipo,
+      descuento_valor: valor,
+      limite_usos: limUsos,
+      usos_maximos: parseInt(usosMax, 10) || 0,
+      usos_actuales: usosAct,
+      limite_tiempo: limTiempo,
+      desde,
+      hasta,
+      activo,
+    });
+  };
+
+  const canSave = codeStr.trim() && parseFloat(descValor) > 0
+    && (!limUsos || parseInt(usosMax, 10) > 0)
+    && (!limTiempo || (desde && hasta));
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="font-display">{code ? "Editar código" : "Nuevo código"}</DialogTitle>
+          <DialogDescription>El cliente lo ingresa en el carrito para obtener el descuento.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <Label htmlFor="cd-code">Código</Label>
+            <Input
+              id="cd-code"
+              value={codeStr}
+              onChange={(e) => setCodeStr(e.target.value.toUpperCase().replace(/\s+/g, ""))}
+              placeholder="KARMA20"
+              className="font-display tracking-widest uppercase"
+              maxLength={20}
+            />
+            <p className="text-xs text-muted-foreground mt-1">Solo letras y números, sin espacios.</p>
+          </div>
+          <div>
+            <Label htmlFor="cd-desc">Descripción <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+            <Input id="cd-desc" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} maxLength={80} />
+          </div>
+
+          {/* Tipo y valor del descuento */}
+          <div>
+            <Label>Tipo de descuento</Label>
+            <div className="flex gap-2 mt-1">
+              {(["porcentaje", "fijo"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setDescTipo(t)}
+                  className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition ${
+                    descTipo === t ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border text-muted-foreground"
+                  }`}
+                >
+                  {t === "porcentaje" ? "Porcentaje (%)" : "Monto fijo ($)"}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <Label htmlFor="cd-valor">
+              {descTipo === "porcentaje" ? "Porcentaje de descuento" : "Monto de descuento (COP)"}
+            </Label>
+            <div className="flex items-center gap-1 mt-1">
+              <Input
+                id="cd-valor"
+                type="number"
+                min={0}
+                max={descTipo === "porcentaje" ? 100 : undefined}
+                value={descValor}
+                onChange={(e) => setDescValor(e.target.value)}
+                className="w-32"
+              />
+              <span className="text-sm text-muted-foreground">{descTipo === "porcentaje" ? "%" : "COP"}</span>
+            </div>
+          </div>
+
+          {/* Límite por usos */}
+          <label className="flex items-center justify-between bg-muted rounded-lg p-3">
+            <div>
+              <span className="text-sm font-medium">Límite de usos</span>
+              <p className="text-xs text-muted-foreground">El código se desactiva al alcanzar el máximo.</p>
+            </div>
+            <Switch checked={limUsos} onCheckedChange={setLimUsos} />
+          </label>
+          {limUsos && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="cd-usos-max">Usos máximos</Label>
+                <Input id="cd-usos-max" type="number" min={1} value={usosMax}
+                  onChange={(e) => setUsosMax(e.target.value)} className="mt-1" />
+              </div>
+              <div>
+                <Label>Usos actuales</Label>
+                <Input value={usosAct} readOnly className="mt-1 opacity-60 cursor-not-allowed" />
+              </div>
+            </div>
+          )}
+
+          {/* Límite por tiempo */}
+          <label className="flex items-center justify-between bg-muted rounded-lg p-3">
+            <div>
+              <span className="text-sm font-medium">Límite de tiempo</span>
+              <p className="text-xs text-muted-foreground">Solo válido entre las fechas indicadas.</p>
+            </div>
+            <Switch checked={limTiempo} onCheckedChange={setLimTiempo} />
+          </label>
+          {limTiempo && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="cd-desde">Desde</Label>
+                <Input id="cd-desde" type="date" value={desde}
+                  onChange={(e) => setDesde(e.target.value)} className="mt-1" />
+              </div>
+              <div>
+                <Label htmlFor="cd-hasta">Hasta</Label>
+                <Input id="cd-hasta" type="date" value={hasta}
+                  onChange={(e) => setHasta(e.target.value)} className="mt-1" />
+              </div>
+            </div>
+          )}
+
+          <label className="flex items-center justify-between bg-muted rounded-lg p-3">
+            <span className="text-sm font-medium">Activo</span>
+            <Switch checked={activo} onCheckedChange={setActivo} />
+          </label>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button onClick={submit} disabled={!canSave} className="bg-gradient-brand text-brand-foreground">
             Guardar
           </Button>
         </DialogFooter>
