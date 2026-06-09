@@ -67,6 +67,8 @@ function calcCodeDiscount(code: PromoCode, base: number): number {
   return Math.min(code.descuento_valor, base);
 }
 
+const DELIVERY_FEE = 5_000; // COP — fijo, no afectado por descuentos
+
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
@@ -129,7 +131,8 @@ function CatalogPage() {
   );
   const discountedSubtotal = cart.subtotal - productDiscountTotal;
   const codeDiscountAmount = appliedCode ? calcCodeDiscount(appliedCode, discountedSubtotal) : 0;
-  const totalFinal = discountedSubtotal - codeDiscountAmount;
+  // Domicilio se suma DESPUÉS de descuentos, no es afectado por códigos
+  const totalFinal = discountedSubtotal - codeDiscountAmount + DELIVERY_FEE;
 
   const logoUrl = state.config.logoSquare;
   const logoHeaderUrl = state.config.logoRect || state.config.logoSquare;
@@ -618,6 +621,9 @@ function CartSheet({
                 <span>Código {appliedCode.code}</span><span>-{formatCOP(codeDiscountAmount)}</span>
               </div>
             )}
+            <div className="flex justify-between text-muted-foreground">
+              <span>Domicilio</span><span>{formatCOP(DELIVERY_FEE)}</span>
+            </div>
             <div className="flex justify-between text-lg font-bold pt-1 border-t border-border">
               <span>Total</span>
               <span className="text-primary font-display">{formatCOP(totalFinal)}</span>
@@ -665,6 +671,7 @@ function CheckoutModal({
     const discLines = [
       productDiscountTotal > 0 ? `\n- Descuento productos: -${formatCOP(productDiscountTotal)}` : "",
       appliedCode ? `\n- Código ${appliedCode.code}: -${formatCOP(codeDiscountAmount)}` : "",
+      `\n- Domicilio: ${formatCOP(DELIVERY_FEE)}`,
     ].join("");
     const msg = `Hola! quisiera hacer un pedido:
 
