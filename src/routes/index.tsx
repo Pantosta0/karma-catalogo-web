@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ShoppingCart, Plus, Minus, Trash2, ImageOff, Send, Settings, X } from "lucide-react";
+import { ShoppingCart, Plus, Minus, Trash2, ImageOff, Send, Settings, X, Clock } from "lucide-react";
 import { LoadingScreen } from "@/components/LoadingScreen";
 
 // Calcula si el negocio está abierto ahora según el horario (zona horaria Bogotá)
@@ -30,6 +30,33 @@ function getIsOpen(schedule: DaySchedule[] | undefined): boolean | null {
   const [th, tm] = ds.to.split(":").map(Number);
   const mins = bogota.getHours() * 60 + bogota.getMinutes();
   return mins >= fh * 60 + fm && mins <= th * 60 + tm;
+}
+
+// Devuelve cuándo abre el negocio la próxima vez (texto legible)
+function getNextOpeningTime(schedule: DaySchedule[]): string | null {
+  if (!schedule || schedule.length !== 7) return null;
+  const bogota = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Bogota" }));
+  const todayDay = bogota.getDay();
+  const todayMins = bogota.getHours() * 60 + bogota.getMinutes();
+  const dayNames = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+
+  // Quizás hoy aún abra más tarde
+  const todayDs = schedule[todayDay];
+  if (todayDs?.open) {
+    const [fh, fm] = todayDs.from.split(":").map(Number);
+    if (todayMins < fh * 60 + fm) return `hoy a las ${todayDs.from}`;
+  }
+
+  // Siguiente día con horario abierto
+  for (let i = 1; i <= 7; i++) {
+    const dayIdx = (todayDay + i) % 7;
+    const ds = schedule[dayIdx];
+    if (ds?.open) {
+      const label = i === 1 ? "mañana" : `el ${dayNames[dayIdx]}`;
+      return `${label} a las ${ds.from}`;
+    }
+  }
+  return null;
 }
 
 // Precio efectivo de un producto considerando su descuento por tiempo limitado
@@ -86,6 +113,7 @@ function CatalogPage() {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [promoOpen, setPromoOpen] = useState(false);
   const [activePromo, setActivePromo] = useState<(typeof state.promos)[0] | null>(null);
+  const [closedOpen, setClosedOpen] = useState(false);
   const [appliedCode, setAppliedCode] = useState<PromoCode | null>(null);
 
   const isOpen = getIsOpen(state.config.schedule);
@@ -103,7 +131,7 @@ function CatalogPage() {
     }
   }, [activeCat]);
 
-  // Mostrar promo activa una vez por sesión
+  // Mostrar promo activa una vez por sesión + popup de cerrado
   useEffect(() => {
     if (loading) return;
     const today = new Date().toISOString().slice(0, 10);
@@ -113,6 +141,11 @@ function CatalogPage() {
     if (promo && !sessionStorage.getItem(`karma_promo_${promo.id}`)) {
       setActivePromo(promo);
       setPromoOpen(true);
+    }
+    // Popup de cerrado — una vez por sesión, solo cuando el horario está configurado
+    if (isOpen === false && !sessionStorage.getItem("karma_closed_shown")) {
+      sessionStorage.setItem("karma_closed_shown", "1");
+      setClosedOpen(true);
     }
   }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -315,6 +348,34 @@ function CatalogPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Popup de restaurante cerrado */}
+      <Dialog open={closedOpen} onOpenChange={setClosedOpen}>
+        <DialogContent className="max-w-sm text-center">
+          <div className="flex flex-col items-center gap-4 pt-2 pb-1">
+            <div className="h-14 w-14 rounded-full bg-red-500/15 border border-red-500/25 flex items-center justify-center">
+              <Clock className="h-6 w-6 text-red-400" />
+            </div>
+            <DialogHeader className="items-center gap-1">
+              <DialogTitle className="font-display text-xl">Estamos cerrados</DialogTitle>
+              <DialogDescription className="text-muted-foreground text-sm">
+                {(() => {
+                  const next = getNextOpeningTime(state.config.schedule);
+                  return next
+                    ? `Por ahora no estamos tomando pedidos. Abrimos ${next}.`
+                    : "Por ahora no estamos tomando pedidos. Vuelve pronto.";
+                })()}
+              </DialogDescription>
+            </DialogHeader>
+            <Button
+              onClick={() => setClosedOpen(false)}
+              className="w-full bg-gradient-brand text-brand-foreground"
+            >
+              Entendido
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Footer */}
       <footer className="mt-16 pb-8 text-center border-t border-border/40 pt-8 max-w-5xl mx-auto">
