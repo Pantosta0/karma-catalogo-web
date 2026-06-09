@@ -967,7 +967,16 @@ function PopupsSubTab() {
         <div className="space-y-3">
           {state.promos.map((p) => {
             const today = new Date().toISOString().slice(0, 10);
-            const active = p.activo && today >= p.desde && today <= p.hasta;
+            const active   = p.activo && today >= p.desde && today <= p.hasta;
+            const expired  = p.activo && !!p.hasta  && today > p.hasta;
+            const scheduled = p.activo && !!p.desde && today < p.desde;
+            const promoStatus = active
+              ? { label: "Activa ahora", cls: "bg-green-500/20 text-green-400" }
+              : expired
+              ? { label: "Expirada",     cls: "bg-muted text-muted-foreground" }
+              : scheduled
+              ? { label: "Programada",   cls: "bg-yellow-500/20 text-yellow-400" }
+              : { label: "Inactiva",     cls: "bg-muted text-muted-foreground" };
             return (
               <div key={p.id} className="bg-card border border-border rounded-xl p-4 flex gap-4">
                 {p.imagen && (
@@ -976,10 +985,8 @@ function PopupsSubTab() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-semibold">{p.titulo}</p>
-                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                      active ? "bg-green-500/20 text-green-400" : p.activo ? "bg-yellow-500/20 text-yellow-400" : "bg-muted text-muted-foreground"
-                    }`}>
-                      {active ? "Activa ahora" : p.activo ? "Programada" : "Inactiva"}
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${promoStatus.cls}`}>
+                      {promoStatus.label}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{p.descripcion}</p>
@@ -1179,8 +1186,10 @@ function CodesSubTab() {
 
   const codeStatus = (c: PromoCode) => {
     if (!c.activo) return { label: "Inactivo", cls: "bg-muted text-muted-foreground" };
-    if (c.limite_tiempo && (today < c.desde || today > c.hasta))
-      return { label: "Fuera de rango", cls: "bg-yellow-500/20 text-yellow-400" };
+    if (c.limite_tiempo && today > c.hasta)
+      return { label: "Expirado", cls: "bg-muted text-muted-foreground" };
+    if (c.limite_tiempo && today < c.desde)
+      return { label: "Programado", cls: "bg-yellow-500/20 text-yellow-400" };
     if (c.limite_usos && c.usos_actuales >= c.usos_maximos)
       return { label: "Agotado", cls: "bg-red-500/20 text-red-400" };
     return { label: "Activo", cls: "bg-green-500/20 text-green-400" };
