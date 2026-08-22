@@ -18,7 +18,8 @@ function loadLines(): StoredLine[] {
     return parsed
       .filter(
         (l): l is StoredLine =>
-          !!l && typeof l === "object" &&
+          !!l &&
+          typeof l === "object" &&
           typeof (l as StoredLine).id === "string" &&
           Number.isFinite((l as StoredLine).cantidad),
       )
@@ -164,5 +165,9 @@ export function useCart(productos: Product[], catalogReady: boolean) {
 }
 
 export function formatCOP(n: number) {
-  return new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n);
+  return new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    maximumFractionDigits: 0,
+  }).format(n);
 }

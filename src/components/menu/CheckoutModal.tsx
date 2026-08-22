@@ -12,15 +12,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCOP, type CartItem } from "@/lib/cart";
-import {
-  getDiscountedPrice,
-  isDiscounted,
-  type AppliedCode,
-} from "@/lib/pricing";
+import { getDiscountedPrice, isDiscounted, type AppliedCode } from "@/lib/pricing";
 
 export function CheckoutModal({
-  open, onOpenChange, items, subtotal, productDiscountTotal,
-  appliedCode, codeDiscountAmount, deliveryFee, totalFinal, whatsapp, onSent,
+  open,
+  onOpenChange,
+  items,
+  subtotal,
+  productDiscountTotal,
+  appliedCode,
+  codeDiscountAmount,
+  deliveryFee,
+  totalFinal,
+  whatsapp,
+  onSent,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
@@ -38,7 +43,9 @@ export function CheckoutModal({
   const [direccion, setDireccion] = useState("");
   const [telefono, setTelefono] = useState("");
   const [pago, setPago] = useState("Efectivo");
-  const [errors, setErrors] = useState<{ nombre?: string; direccion?: string; telefono?: string }>({});
+  const [errors, setErrors] = useState<{ nombre?: string; direccion?: string; telefono?: string }>(
+    {},
+  );
   const [enviando, setEnviando] = useState(false);
 
   // Un número colombiano son 10 dígitos; se aceptan 7 (fijo) a 15 (E.164).
@@ -48,7 +55,8 @@ export function CheckoutModal({
     if (!direccion.trim()) next.direccion = "Sin dirección no podemos llevarlo.";
     const digits = telefono.replace(/\D/g, "");
     if (!digits) next.telefono = "Necesitamos un número para confirmarte.";
-    else if (digits.length < 7 || digits.length > 15) next.telefono = "Ese número no parece completo.";
+    else if (digits.length < 7 || digits.length > 15)
+      next.telefono = "Ese número no parece completo.";
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -74,7 +82,9 @@ export function CheckoutModal({
       })
       .join("\n");
     const discLines = [
-      productDiscountTotal > 0 ? `\n- Descuento productos: -${formatCOP(productDiscountTotal)}` : "",
+      productDiscountTotal > 0
+        ? `\n- Descuento productos: -${formatCOP(productDiscountTotal)}`
+        : "",
       appliedCode ? `\n- Código ${appliedCode.code}: -${formatCOP(codeDiscountAmount)}` : "",
       deliveryFee > 0 ? `\n- Domicilio: ${formatCOP(deliveryFee)}` : "",
     ].join("");
@@ -118,14 +128,19 @@ Total: ${formatCOP(totalFinal)}`;
             <Input
               id="nombre"
               value={nombre}
-              onChange={(e) => { setNombre(e.target.value); setErrors((p) => ({ ...p, nombre: undefined })); }}
+              onChange={(e) => {
+                setNombre(e.target.value);
+                setErrors((p) => ({ ...p, nombre: undefined }));
+              }}
               maxLength={80}
               autoComplete="name"
               aria-invalid={!!errors.nombre}
               aria-describedby={errors.nombre ? "nombre-error" : undefined}
             />
             {errors.nombre && (
-              <p id="nombre-error" className="text-xs text-brand-bright mt-1">{errors.nombre}</p>
+              <p id="nombre-error" className="text-xs text-brand-bright mt-1">
+                {errors.nombre}
+              </p>
             )}
           </div>
           <div>
@@ -133,7 +148,10 @@ Total: ${formatCOP(totalFinal)}`;
             <Textarea
               id="dir"
               value={direccion}
-              onChange={(e) => { setDireccion(e.target.value); setErrors((p) => ({ ...p, direccion: undefined })); }}
+              onChange={(e) => {
+                setDireccion(e.target.value);
+                setErrors((p) => ({ ...p, direccion: undefined }));
+              }}
               maxLength={240}
               rows={2}
               autoComplete="street-address"
@@ -141,7 +159,9 @@ Total: ${formatCOP(totalFinal)}`;
               aria-describedby={errors.direccion ? "dir-error" : undefined}
             />
             {errors.direccion && (
-              <p id="dir-error" className="text-xs text-brand-bright mt-1">{errors.direccion}</p>
+              <p id="dir-error" className="text-xs text-brand-bright mt-1">
+                {errors.direccion}
+              </p>
             )}
           </div>
           <div>
@@ -150,7 +170,10 @@ Total: ${formatCOP(totalFinal)}`;
               id="tel"
               type="tel"
               value={telefono}
-              onChange={(e) => { setTelefono(e.target.value); setErrors((p) => ({ ...p, telefono: undefined })); }}
+              onChange={(e) => {
+                setTelefono(e.target.value);
+                setErrors((p) => ({ ...p, telefono: undefined }));
+              }}
               inputMode="tel"
               maxLength={20}
               autoComplete="tel"
@@ -158,7 +181,9 @@ Total: ${formatCOP(totalFinal)}`;
               aria-describedby={errors.telefono ? "tel-error" : undefined}
             />
             {errors.telefono && (
-              <p id="tel-error" className="text-xs text-brand-bright mt-1">{errors.telefono}</p>
+              <p id="tel-error" className="text-xs text-brand-bright mt-1">
+                {errors.telefono}
+              </p>
             )}
           </div>
           <div>

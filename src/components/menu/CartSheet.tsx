@@ -4,16 +4,20 @@ import { SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatCOP, type CartItem } from "@/lib/cart";
-import {
-  getDiscountedPrice,
-  isDiscounted,
-  validateCode,
-  type AppliedCode,
-} from "@/lib/pricing";
+import { getDiscountedPrice, isDiscounted, validateCode, type AppliedCode } from "@/lib/pricing";
 
 export function CartSheet({
-  items, subtotal, productDiscountTotal, appliedCode, codeDiscountAmount, deliveryFee, totalFinal,
-  onApplyCode, setQty, remove, onCheckout,
+  items,
+  subtotal,
+  productDiscountTotal,
+  appliedCode,
+  codeDiscountAmount,
+  deliveryFee,
+  totalFinal,
+  onApplyCode,
+  setQty,
+  remove,
+  onCheckout,
 }: {
   items: CartItem[];
   subtotal: number;
@@ -80,21 +84,34 @@ export function CartSheet({
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm line-clamp-1">{i.product.nombre}</p>
                   <div className="flex items-center gap-1.5">
-                    <p className="tabular text-brand-bright font-bold text-sm">{formatCOP(getDiscountedPrice(i.product) * i.cantidad)}</p>
-                    {discounted && <p className="text-muted-foreground text-xs line-through">{formatCOP(i.product.precio * i.cantidad)}</p>}
+                    <p className="tabular text-brand-bright font-bold text-sm">
+                      {formatCOP(getDiscountedPrice(i.product) * i.cantidad)}
+                    </p>
+                    {discounted && (
+                      <p className="text-muted-foreground text-xs line-through">
+                        {formatCOP(i.product.precio * i.cantidad)}
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 mt-1">
-                    <button onClick={() => setQty(i.product.id, i.cantidad - 1)}
-                      className="focus-ring h-11 w-11 rounded-full bg-card border border-border flex items-center justify-center">
+                    <button
+                      onClick={() => setQty(i.product.id, i.cantidad - 1)}
+                      className="focus-ring h-11 w-11 rounded-full bg-card border border-border flex items-center justify-center"
+                    >
                       <Minus className="h-3 w-3" />
                     </button>
                     <span className="text-sm font-semibold w-5 text-center">{i.cantidad}</span>
-                    <button onClick={() => setQty(i.product.id, i.cantidad + 1)}
-                      className="focus-ring h-11 w-11 rounded-full bg-card border border-border flex items-center justify-center">
+                    <button
+                      onClick={() => setQty(i.product.id, i.cantidad + 1)}
+                      className="focus-ring h-11 w-11 rounded-full bg-card border border-border flex items-center justify-center"
+                    >
                       <Plus className="h-3 w-3" />
                     </button>
-                    <button onClick={() => remove(i.product.id)}
-                      className="focus-ring ml-auto h-11 w-11 -mr-1 rounded-full flex items-center justify-center text-brand-bright" aria-label="Eliminar">
+                    <button
+                      onClick={() => remove(i.product.id)}
+                      className="focus-ring ml-auto h-11 w-11 -mr-1 rounded-full flex items-center justify-center text-brand-bright"
+                      aria-label="Eliminar"
+                    >
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
@@ -113,7 +130,11 @@ export function CartSheet({
                 <div>
                   <p className="text-xs font-bold text-green-400">Código: {appliedCode.code}</p>
                   <p className="text-xs text-muted-foreground">
-                    -{appliedCode.descuento_tipo === "porcentaje" ? `${appliedCode.descuento_valor}%` : formatCOP(appliedCode.descuento_valor)} del subtotal
+                    -
+                    {appliedCode.descuento_tipo === "porcentaje"
+                      ? `${appliedCode.descuento_valor}%`
+                      : formatCOP(appliedCode.descuento_valor)}{" "}
+                    del subtotal
                   </p>
                 </div>
                 <button
@@ -126,10 +147,16 @@ export function CartSheet({
               </div>
             ) : (
               <div className="flex gap-2">
-                <Input placeholder="Código promo" value={codeInput}
-                  onChange={(e) => { setCodeInput(e.target.value.toUpperCase()); setCodeError(""); }}
+                <Input
+                  placeholder="Código promo"
+                  value={codeInput}
+                  onChange={(e) => {
+                    setCodeInput(e.target.value.toUpperCase());
+                    setCodeError("");
+                  }}
                   onKeyDown={(e) => e.key === "Enter" && applyCode()}
-                  className="font-display tracking-widest uppercase text-sm" />
+                  className="font-display tracking-widest uppercase text-sm"
+                />
                 <Button
                   variant="outline"
                   size="sm"
@@ -156,31 +183,42 @@ export function CartSheet({
           {/* Desglose */}
           <div className="tabular space-y-1 text-sm">
             <div className="flex justify-between text-muted-foreground">
-              <span>Subtotal</span><span>{formatCOP(subtotal)}</span>
+              <span>Subtotal</span>
+              <span>{formatCOP(subtotal)}</span>
             </div>
             {productDiscountTotal > 0 && (
               <div className="flex justify-between text-green-400">
-                <span>Descuentos productos</span><span>-{formatCOP(productDiscountTotal)}</span>
+                <span>Descuentos productos</span>
+                <span>-{formatCOP(productDiscountTotal)}</span>
               </div>
             )}
             {appliedCode && codeDiscountAmount > 0 && (
               <div className="flex justify-between text-green-400">
-                <span>Código {appliedCode.code}</span><span>-{formatCOP(codeDiscountAmount)}</span>
+                <span>Código {appliedCode.code}</span>
+                <span>-{formatCOP(codeDiscountAmount)}</span>
               </div>
             )}
             {deliveryFee > 0 && (
               <div className="flex justify-between text-muted-foreground">
-                <span>Domicilio</span><span>{formatCOP(deliveryFee)}</span>
+                <span>Domicilio</span>
+                <span>{formatCOP(deliveryFee)}</span>
               </div>
             )}
             <div className="flex justify-between text-lg font-bold pt-1 border-t border-border">
               <span>Total</span>
-              <span className="tabular text-brand-bright font-display">{formatCOP(totalFinal)}</span>
+              <span className="tabular text-brand-bright font-display">
+                {formatCOP(totalFinal)}
+              </span>
             </div>
           </div>
 
-          <Button onClick={onCheckout} size="lg" className="w-full bg-gradient-brand text-brand-foreground hover:opacity-95">
-            <Send className="h-4 w-4 mr-2" />Enviar pedido por WhatsApp
+          <Button
+            onClick={onCheckout}
+            size="lg"
+            className="w-full bg-gradient-brand text-brand-foreground hover:opacity-95"
+          >
+            <Send className="h-4 w-4 mr-2" />
+            Enviar pedido por WhatsApp
           </Button>
         </div>
       )}

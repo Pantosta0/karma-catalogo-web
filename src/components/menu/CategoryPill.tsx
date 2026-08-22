@@ -8,9 +8,7 @@ export const CategoryPill = forwardRef<
     ref={ref}
     onClick={onClick}
     className={`focus-ring relative z-10 px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-colors duration-200 ${
-      active
-        ? "text-primary-foreground"
-        : "text-muted-foreground hover:text-foreground"
+      active ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"
     }`}
   >
     {children}

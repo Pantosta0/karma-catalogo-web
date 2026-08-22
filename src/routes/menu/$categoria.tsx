@@ -32,9 +32,7 @@ function CategoryProducts() {
 
   const visibles = useMemo(
     () =>
-      state.productos.filter(
-        (p) => p.disponible && (esTodos || p.categorias.includes(categoria)),
-      ),
+      state.productos.filter((p) => p.disponible && (esTodos || p.categorias.includes(categoria))),
     [state.productos, categoria, esTodos],
   );
 

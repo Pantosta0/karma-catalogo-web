@@ -109,7 +109,9 @@ function MenuLayout() {
     if (bar && ro) ro.observe(bar);
 
     let cancelled = false;
-    document.fonts?.ready.then(() => { if (!cancelled) measure(); });
+    document.fonts?.ready.then(() => {
+      if (!cancelled) measure();
+    });
 
     return () => {
       cancelled = true;
@@ -121,9 +123,8 @@ function MenuLayout() {
   useEffect(() => {
     if (loading) return;
     const today = new Date().toISOString().slice(0, 10);
-    const promo = state.promos?.find(
-      (p) => p.activo && today >= p.desde && today <= p.hasta
-    ) ?? null;
+    const promo =
+      state.promos?.find((p) => p.activo && today >= p.desde && today <= p.hasta) ?? null;
     if (promo && !sessionStorage.getItem(`karma_promo_${promo.id}`)) {
       setActivePromo(promo);
       setPromoOpen(true);
@@ -172,7 +173,11 @@ function MenuLayout() {
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
           {/* El logo lleva a la portada de marca, no al menú: desde /menu ya
               se está en el menú, y es el único camino de vuelta a "/". */}
-          <Link to="/" aria-label={`${state.config.nombre} — inicio`} className="focus-ring rounded shrink-0">
+          <Link
+            to="/"
+            aria-label={`${state.config.nombre} — inicio`}
+            className="focus-ring rounded shrink-0"
+          >
             {logoHeaderUrl ? (
               // El logo lo sube el dueño y su proporción es desconocida, así que
               // width/height afirmarían una relación que puede ser falsa. En su
@@ -196,11 +201,13 @@ function MenuLayout() {
             )}
           </Link>
           {isOpen !== null && (
-            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full shrink-0 ${
-              isOpen
-                ? "bg-green-500/20 text-green-400 border border-green-500/30"
-                : "bg-red-500/20 text-red-400 border border-red-500/30"
-            }`}>
+            <span
+              className={`text-[11px] font-bold px-2.5 py-1 rounded-full shrink-0 ${
+                isOpen
+                  ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                  : "bg-red-500/20 text-red-400 border border-red-500/30"
+              }`}
+            >
               {isOpen ? "Abierto" : "Cerrado"}
             </span>
           )}
@@ -270,7 +277,10 @@ function MenuLayout() {
               )}
               <CategoryPill
                 active={categoria === "todos"}
-                ref={(el) => { if (el) pillRefs.current.set("todos", el); else pillRefs.current.delete("todos"); }}
+                ref={(el) => {
+                  if (el) pillRefs.current.set("todos", el);
+                  else pillRefs.current.delete("todos");
+                }}
                 onClick={() => navigate({ to: "/menu/$categoria", params: { categoria: "todos" } })}
               >
                 Todos
@@ -279,7 +289,10 @@ function MenuLayout() {
                 <CategoryPill
                   key={c.id}
                   active={categoria === c.id}
-                  ref={(el) => { if (el) pillRefs.current.set(c.id, el); else pillRefs.current.delete(c.id); }}
+                  ref={(el) => {
+                    if (el) pillRefs.current.set(c.id, el);
+                    else pillRefs.current.delete(c.id);
+                  }}
                   onClick={() => navigate({ to: "/menu/$categoria", params: { categoria: c.id } })}
                 >
                   {c.nombre}
@@ -310,12 +323,15 @@ function MenuLayout() {
 
       {/* Promo popup */}
       {activePromo && (
-        <Dialog open={promoOpen} onOpenChange={(o) => {
-          if (!o) {
-            sessionStorage.setItem(`karma_promo_${activePromo.id}`, "1");
-            setPromoOpen(false);
-          }
-        }}>
+        <Dialog
+          open={promoOpen}
+          onOpenChange={(o) => {
+            if (!o) {
+              sessionStorage.setItem(`karma_promo_${activePromo.id}`, "1");
+              setPromoOpen(false);
+            }
+          }}
+        >
           <DialogContent className="max-w-sm p-0 overflow-hidden gap-0">
             {activePromo.imagen && (
               <div className="aspect-video w-full bg-muted">
@@ -400,11 +416,9 @@ function MenuLayout() {
           // pedidos simultáneos ya no se pisan el contador.
           if (appliedCode) {
             const id = appliedCode.id;
-            supabase
-              .rpc("increment_code_usage", { code_id: id })
-              .then(({ error }) => {
-                if (error) console.warn("[promo] no se pudo contar el uso:", error.message);
-              });
+            supabase.rpc("increment_code_usage", { code_id: id }).then(({ error }) => {
+              if (error) console.warn("[promo] no se pudo contar el uso:", error.message);
+            });
             setAppliedCode(null);
           }
           cart.clear();

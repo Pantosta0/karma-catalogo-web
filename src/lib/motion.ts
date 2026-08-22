@@ -34,8 +34,7 @@
 
 /** Carga diferida de las features de Motion. Ver la nota de arriba: pasar esto
  *  y no el objeto es lo que mantiene la animación fuera del chunk compartido. */
-export const loadDomAnimation = () =>
-  import("./motion-features").then((m) => m.default);
+export const loadDomAnimation = () => import("./motion-features").then((m) => m.default);
 
 /** La curva de `.slider-indicator`. Sale rápido y frena largo: para cosas que
  *  se desplazan o entran. */

@@ -40,11 +40,17 @@ export function ProductCard({
         )}
       </button>
       <div className="p-3 pb-12">
-        <h3 className="font-semibold text-sm sm:text-base leading-tight line-clamp-2">{product.nombre}</h3>
+        <h3 className="font-semibold text-sm sm:text-base leading-tight line-clamp-2">
+          {product.nombre}
+        </h3>
         {isDiscounted(product) ? (
           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-            <p className="text-brand-bright font-display font-bold">{formatCOP(getDiscountedPrice(product))}</p>
-            <p className="text-muted-foreground text-xs line-through">{formatCOP(product.precio)}</p>
+            <p className="text-brand-bright font-display font-bold">
+              {formatCOP(getDiscountedPrice(product))}
+            </p>
+            <p className="text-muted-foreground text-xs line-through">
+              {formatCOP(product.precio)}
+            </p>
             {/* Relleno sólido, no un lavado al 15%: sobre el wash el rojo se
                 quedaba en 4.24:1. Blanco sobre el relleno da 4.56:1. */}
             <span className="text-[11px] font-bold bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full">
@@ -52,7 +58,9 @@ export function ProductCard({
             </span>
           </div>
         ) : (
-          <p className="text-brand-bright font-display font-bold mt-1">{formatCOP(product.precio)}</p>
+          <p className="text-brand-bright font-display font-bold mt-1">
+            {formatCOP(product.precio)}
+          </p>
         )}
       </div>
       <button
