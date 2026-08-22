@@ -1,0 +1,269 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-21T00:00:00.000Z",
+  "title": "Design System: Karma",
+  "extensions": {
+    "colorMeta": {
+      "karma-red": {
+        "role": "primary",
+        "displayName": "Karma Red",
+        "canonical": "oklch(0.624 0.254 25.9)",
+        "note": "Identity red (#FC0025). Atmosphere and emission only: radial page washes, halo shadows, the CTA gradient, the loader pulse.",
+        "tonalRamp": [
+          "oklch(0.15 0.08 25.9)",
+          "oklch(0.26 0.14 25.9)",
+          "oklch(0.37 0.19 25.9)",
+          "oklch(0.48 0.23 25.9)",
+          "oklch(0.624 0.254 25.9)",
+          "oklch(0.72 0.21 25.9)",
+          "oklch(0.84 0.13 25.9)",
+          "oklch(0.95 0.05 25.9)"
+        ]
+      },
+      "karma-red-fill": {
+        "role": "primary",
+        "displayName": "Karma Red Fill",
+        "canonical": "oklch(0.594 0.242 25.9)",
+        "note": "#EC0022. Every solid interactive fill. 0.03 below the identity red so bone-white on it measures 4.56:1 instead of 4.06:1.",
+        "tonalRamp": [
+          "oklch(0.15 0.08 25.9)",
+          "oklch(0.26 0.14 25.9)",
+          "oklch(0.37 0.19 25.9)",
+          "oklch(0.48 0.23 25.9)",
+          "oklch(0.594 0.242 25.9)",
+          "oklch(0.71 0.21 25.9)",
+          "oklch(0.84 0.13 25.9)",
+          "oklch(0.95 0.05 25.9)"
+        ]
+      },
+      "karma-red-type": {
+        "role": "primary",
+        "displayName": "Karma Red Type",
+        "canonical": "oklch(0.64 0.244 25.9)",
+        "note": "#FE2531. Red set as text on dark ground: 5.13:1 on verdict-black, 4.59:1 on slab. The identity red fails at 4.29:1 on slab.",
+        "tonalRamp": [
+          "oklch(0.15 0.08 25.9)",
+          "oklch(0.27 0.14 25.9)",
+          "oklch(0.39 0.19 25.9)",
+          "oklch(0.51 0.23 25.9)",
+          "oklch(0.64 0.244 25.9)",
+          "oklch(0.75 0.19 25.9)",
+          "oklch(0.86 0.12 25.9)",
+          "oklch(0.95 0.05 25.9)"
+        ]
+      },
+      "bone-cream": {
+        "role": "secondary",
+        "displayName": "Bone Cream",
+        "canonical": "oklch(0.909 0.088 105.2)",
+        "note": "#E9E5A0. The only warm value. Add-to-cart, cart count badge, and every focus ring. 14.97:1 on verdict-black.",
+        "tonalRamp": [
+          "oklch(0.15 0.03 105.2)",
+          "oklch(0.26 0.045 105.2)",
+          "oklch(0.38 0.06 105.2)",
+          "oklch(0.50 0.07 105.2)",
+          "oklch(0.62 0.08 105.2)",
+          "oklch(0.75 0.085 105.2)",
+          "oklch(0.909 0.088 105.2)",
+          "oklch(0.96 0.05 105.2)"
+        ]
+      },
+      "verdict-black": {
+        "role": "neutral",
+        "displayName": "Verdict Black",
+        "canonical": "oklch(0.159 0 0)",
+        "note": "#0D0D0D. The page. Deliberately a step above pure black so slab has somewhere to sit.",
+        "tonalRamp": [
+          "oklch(0.159 0 0)",
+          "oklch(0.218 0 0)",
+          "oklch(0.26 0 0)",
+          "oklch(0.38 0 0)",
+          "oklch(0.50 0 0)",
+          "oklch(0.68 0 0)",
+          "oklch(0.84 0 0)",
+          "oklch(1 0 0)"
+        ]
+      },
+      "slab": {
+        "role": "neutral",
+        "displayName": "Slab",
+        "canonical": "oklch(0.218 0 0)",
+        "note": "#1A1A1A. Cards, dialogs, popovers, admin header. First tonal step; 1.12:1 against the page, so the hairline border carries the seam."
+      },
+      "ash": {
+        "role": "neutral",
+        "displayName": "Ash",
+        "canonical": "oklch(0.26 0 0)",
+        "note": "Recessed wells: stepper tracks, muted panels, inactive admin tabs."
+      },
+      "smoke": {
+        "role": "neutral",
+        "displayName": "Smoke",
+        "canonical": "oklch(0.68 0 0)",
+        "note": "Secondary text and inactive labels. True neutral by design; 6.75:1 on the page."
+      },
+      "bone-white": {
+        "role": "neutral",
+        "displayName": "Bone White",
+        "canonical": "oklch(1 0 0)",
+        "note": "Primary text, and every label sitting on a red fill."
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "oklch(1 0 0 / 16%)",
+        "note": "All borders and dividers. White at low alpha rather than a grey, so it reads consistently over page and card."
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "The catalog's opening line and page titles. Anton, uppercase, one or two lines only." },
+      "headline": { "displayName": "Headline", "purpose": "Dialog and sheet titles." },
+      "title": { "displayName": "Title", "purpose": "Product names in the grid and cart. Barlow, because names are read rather than proclaimed." },
+      "body": { "displayName": "Body", "purpose": "Reading copy at ~65ch. Extra leading and positive tracking compensate for light-on-dark bloom." },
+      "label": { "displayName": "Label", "purpose": "Field labels, status pills, price breakdown rows." },
+      "stamp": { "displayName": "Stamp", "purpose": "Signature treatment: extreme letterspaced Anton at 11px. Currently only 'CARGANDO' under the loader. Never twice on one screen." }
+    },
+    "shadows": [
+      {
+        "name": "card-glow",
+        "value": "0 4px 20px -2px color-mix(in oklab, oklch(0.624 0.254 25.9) 30%, transparent)",
+        "purpose": "Default emission. Product cards, cart FAB, add button. Describes an object burning, not floating."
+      },
+      {
+        "name": "soft-glow",
+        "value": "0 2px 10px -2px color-mix(in oklab, oklch(0.624 0.254 25.9) 20%, transparent)",
+        "purpose": "Half intensity, for supporting elements: the sliding category indicator and admin cards."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-arrival",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Default. Fast departure, long settle. Category indicator at 220ms."
+      },
+      {
+        "name": "karma-fill",
+        "value": "clip-path inset(100% 0 0 0) -> inset(0% 0 0 0) over 1.6s cubic-bezier(0.4, 0, 0.2, 1) forwards",
+        "purpose": "The authored moment: the mark filling with colour bottom-to-top like a glass."
+      },
+      {
+        "name": "karma-pulse",
+        "value": "opacity 1 -> 0.45 -> 1 over 1.8s ease-in-out infinite",
+        "purpose": "The prefers-reduced-motion substitute for karma-fill. Preserves 'working' without the vertical sweep."
+      }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" }
+    ],
+    "containers": [
+      { "name": "app", "value": "64rem", "purpose": "Catalog and admin column." },
+      { "name": "reading", "value": "34rem", "purpose": "Prose surfaces, ~65 characters." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Every commit action: add to cart, send by WhatsApp, save.",
+      "html": "<button class=\"ds-btn-primary\">Enviar pedido por WhatsApp</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; height: 3rem; padding: 0 2rem; border: none; border-radius: 6px; background-image: linear-gradient(135deg, oklch(0.624 0.254 25.9), color-mix(in oklab, oklch(0.624 0.254 25.9) 75%, oklch(0 0 0))); color: oklch(1 0 0); font-family: Barlow, system-ui, sans-serif; font-size: 1rem; font-weight: 600; cursor: pointer; transition: opacity .2s; } .ds-btn-primary:hover { opacity: .95; } .ds-btn-primary:focus-visible { outline: 2px solid oklch(0.909 0.088 105.2); outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary Button (Cream)",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "The handover moment. Cream is the only warm value in the system.",
+      "html": "<button class=\"ds-btn-secondary\">Agregar al carrito</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; height: 3rem; padding: 0 2rem; border: none; border-radius: 6px; background: oklch(0.909 0.088 105.2); color: oklch(0.159 0 0); font-family: Barlow, system-ui, sans-serif; font-size: 1rem; font-weight: 600; cursor: pointer; transition: opacity .2s; } .ds-btn-secondary:hover { opacity: .9; } .ds-btn-secondary:focus-visible { outline: 2px solid oklch(0.909 0.088 105.2); outline-offset: 2px; }"
+    },
+    {
+      "name": "Add Button",
+      "kind": "button",
+      "refersTo": "button-icon",
+      "description": "The cream pill on every product card. 44px minimum, fully round.",
+      "html": "<button class=\"ds-btn-add\" aria-label=\"Agregar\"><svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"><path d=\"M12 5v14M5 12h14\"/></svg></button>",
+      "css": ".ds-btn-add { display: inline-flex; align-items: center; justify-content: center; height: 44px; width: 44px; border: none; border-radius: 9999px; background: oklch(0.909 0.088 105.2); color: oklch(0.159 0 0); cursor: pointer; box-shadow: 0 4px 20px -2px color-mix(in oklab, oklch(0.624 0.254 25.9) 30%, transparent); transition: transform .2s; } .ds-btn-add:hover { transform: scale(1.1); } .ds-btn-add:focus-visible { outline: 2px solid oklch(0.909 0.088 105.2); outline-offset: 2px; }"
+    },
+    {
+      "name": "Category Pill",
+      "kind": "chip",
+      "refersTo": "category-pill",
+      "description": "Selection is carried by a sliding indicator behind the labels, not by restyling the pill.",
+      "html": "<div class=\"ds-catbar\"><span class=\"ds-catbar-ind\"></span><button class=\"ds-cat ds-cat-on\">Hamburguesas</button><button class=\"ds-cat\">Asados</button><button class=\"ds-cat\">Bebidas</button></div>",
+      "css": ".ds-catbar { position: relative; display: inline-flex; gap: 8px; } .ds-catbar-ind { position: absolute; top: 0; bottom: 0; left: 0; width: 148px; border-radius: 9999px; background: oklch(0.594 0.242 25.9); box-shadow: 0 2px 10px -2px color-mix(in oklab, oklch(0.624 0.254 25.9) 20%, transparent); transition: transform 220ms cubic-bezier(.16,1,.3,1), width 220ms cubic-bezier(.16,1,.3,1); } .ds-cat { position: relative; z-index: 1; padding: 8px 16px; border: none; background: none; border-radius: 9999px; font-family: Barlow, system-ui, sans-serif; font-size: .875rem; font-weight: 600; color: oklch(0.68 0 0); white-space: nowrap; cursor: pointer; transition: color .2s; } .ds-cat-on { color: oklch(1 0 0); } .ds-cat:hover { color: oklch(1 0 0); } .ds-cat:focus-visible { outline: 2px solid oklch(0.909 0.088 105.2); outline-offset: 2px; }"
+    },
+    {
+      "name": "Product Card",
+      "kind": "card",
+      "refersTo": "product-card",
+      "description": "Square image, name, price, and a floating cream add button. 48px reserved at the foot so the button never collides with the price.",
+      "html": "<article class=\"ds-card\"><div class=\"ds-card-img\"></div><div class=\"ds-card-body\"><h3 class=\"ds-card-name\">Karma Burger</h3><p class=\"ds-card-price\">$ 22.000</p></div><button class=\"ds-card-add\" aria-label=\"Agregar\"><svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"><path d=\"M12 5v14M5 12h14\"/></svg></button></article>",
+      "css": ".ds-card { position: relative; width: 200px; border-radius: 16px; overflow: hidden; background: oklch(0.218 0 0); border: 1px solid oklch(1 0 0 / 16%); box-shadow: 0 4px 20px -2px color-mix(in oklab, oklch(0.624 0.254 25.9) 30%, transparent); transition: transform .2s; } .ds-card:hover { transform: translateY(-2px); } .ds-card-img { aspect-ratio: 1; background: oklch(0.26 0 0); } .ds-card-body { padding: 12px 12px 48px; } .ds-card-name { margin: 0; font-family: Barlow, system-ui, sans-serif; font-size: 1rem; font-weight: 600; line-height: 1.25; color: oklch(1 0 0); } .ds-card-price { margin: 4px 0 0; font-family: Anton, system-ui, sans-serif; font-size: 1rem; letter-spacing: .02em; color: oklch(0.64 0.244 25.9); font-variant-numeric: tabular-nums; } .ds-card-add { position: absolute; right: 12px; bottom: 12px; display: inline-flex; align-items: center; justify-content: center; height: 44px; width: 44px; border: none; border-radius: 9999px; background: oklch(0.909 0.088 105.2); color: oklch(0.159 0 0); cursor: pointer; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "16px type on mobile is deliberate: iOS Safari force-zooms any focused input below it.",
+      "html": "<input class=\"ds-input\" placeholder=\"Nombre completo\" />",
+      "css": ".ds-input { display: block; width: 260px; height: 44px; padding: 0 12px; border: 1px solid oklch(1 0 0 / 14%); border-radius: 6px; background: transparent; color: oklch(1 0 0); font-family: Barlow, system-ui, sans-serif; font-size: 1rem; caret-color: oklch(0.64 0.244 25.9); } .ds-input::placeholder { color: oklch(0.68 0 0); } .ds-input:focus-visible { outline: 2px solid oklch(0.909 0.088 105.2); outline-offset: 2px; }"
+    },
+    {
+      "name": "Status Chip",
+      "kind": "chip",
+      "refersTo": null,
+      "description": "Open/closed state in the header, and promo status in admin. Alpha wash plus a matching border.",
+      "html": "<span class=\"ds-chip ds-chip-open\">Abierto</span> <span class=\"ds-chip ds-chip-closed\">Cerrado</span>",
+      "css": ".ds-chip { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 9999px; font-family: Barlow, system-ui, sans-serif; font-size: 11px; font-weight: 700; } .ds-chip-open { background: color-mix(in oklab, #22c55e 20%, transparent); border: 1px solid color-mix(in oklab, #22c55e 30%, transparent); color: #4ade80; } .ds-chip-closed { background: color-mix(in oklab, #ef4444 20%, transparent); border: 1px solid color-mix(in oklab, #ef4444 30%, transparent); color: #f87171; }"
+    },
+    {
+      "name": "Discount Badge",
+      "kind": "chip",
+      "refersTo": "badge-discount",
+      "description": "Solid fill, not an alpha wash — on a 15% wash the red measured 4.24:1 and failed AA.",
+      "html": "<span class=\"ds-badge\">-20%</span>",
+      "css": ".ds-badge { display: inline-flex; align-items: center; padding: 2px 6px; border-radius: 9999px; background: oklch(0.594 0.242 25.9); color: oklch(1 0 0); font-family: Barlow, system-ui, sans-serif; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Midnight Verdict",
+    "overview": "Karma is named for a reckoning, and the interface treats it that way. The tagline is an accusation with a reward attached — Sabes lo que hiciste. Te lo mereces hoy. — and the whole system is built to deliver that line without blinking: near-black ground, one saturated red that behaves like a sentence being handed down, and an engraved fox in sunglasses who has already decided. Nothing here apologizes or softens. This is a menu you open at 11pm knowing exactly why.\n\nThe execution is graphic and poster-like rather than software-like. Components read as printed shapes — solid fills, fully-round pills, uppercase Anton set tight — closer to apparel graphics or a gig poster than to app chrome. Surfaces are flat and stacked by tone, not by shadow. Where light does appear it is red and it emits: the glow under a product card or the cart button is the object burning, not the object floating.\n\nThe one restraint in the system is cream. It is the only warm thing on the page, and it appears where the interface is handing something over — the add-to-cart button, the cart count, the focus ring. Its scarcity is currently more severe than it needs to be, and the system is being pushed to use it more.",
+    "keyCharacteristics": [
+      "Near-black ground (verdict-black) with tonal layering, never neutral drop shadows",
+      "One hue of red doing three separate, non-interchangeable jobs",
+      "Anton in uppercase for every heading; Barlow carries all reading",
+      "Fully-round pills for anything you touch; 16px sheets for anything that contains",
+      "Red light as emission, never as elevation",
+      "Nothing in the ordering path smaller than 44×44px"
+    ],
+    "rules": [
+      { "name": "The Three Reds Rule", "body": "One hue (25.9°), three jobs, never interchangeable. karma-red emits, karma-red-fill fills, karma-red-type is read. Substituting any one for another either breaks WCAG AA or kills the brand accuracy — the three exist precisely because no single value can do all three jobs. If you need a red and don't know which, you need karma-red-fill.", "section": "colors" },
+      { "name": "The Cream Rule", "body": "Cream is never a background and never a large region. It marks the moment the interface hands something to the customer — add this, this is yours, you are here. Its power is scarcity, but the current implementation under-spends it: cream should be reaching more of the confirmation and success moments than it does today. Expand it into those, not into surfaces.", "section": "colors" },
+      { "name": "The No Grey Text Rule", "body": "Secondary text is smoke, a true neutral, because the surfaces underneath are true neutrals. Do not tint secondary text toward the red to warm it up — on this ground it reads as a failed link, not as brand.", "section": "colors" },
+      { "name": "The Anton Shouts, Barlow Explains Rule", "body": "Anton is uppercase, always, and never carries more than two lines at mobile width. The moment a heading needs a third line it is not a heading — cut it or demote it to Title.", "section": "typography" },
+      { "name": "The Tabular Money Rule", "body": "Any figure that appears in a vertical stack — cart line items, the price breakdown, totals — is set with tabular-nums. Proportional digits make columns of pesos wobble, and this product's whole credibility rests on the number being right.", "section": "typography" },
+      { "name": "The Light, Not Lift Rule", "body": "The red glow means an object is emitting, never that it is floating. It therefore never appears on a surface that is merely above another surface — dialogs, sheets and popovers get tone and a hairline border, not glow. If you find yourself adding glow to communicate stacking order, use a tonal step instead.", "section": "elevation" },
+      { "name": "The Three Tones Rule", "body": "There are exactly three surface tones. A fourth means the information architecture is too deep, not that the palette is too small.", "section": "elevation" },
+      { "name": "The Pill or the Sheet Rule", "body": "Fully round, or 16px and under. A 24px radius on an interactive element is neither, and reads as a mistake in both directions.", "section": "shapes" }
+    ],
+    "dos": [
+      "Do pick the red by job, not by eye: karma-red-fill behind white text, karma-red-type for red text on dark, karma-red for glow and gradient.",
+      "Do set every stacked figure in tabular-nums.",
+      "Do keep all ordering-path controls at 44×44 or larger, including on desktop — the admin runs on an iPad, which is a touch surface.",
+      "Do give reduced-motion an intentional substitute that preserves the meaning, the way the loader swaps its sweep for a pulse. A blanket 0.01ms kill is a bug.",
+      "Do use -3px inset focus offset for any control whose ancestor clips with overflow: hidden; an outward ring is silently erased there.",
+      "Do hold prose to ~65ch and let the app container stay at 64rem."
+    ],
+    "donts": [
+      "Don't put the red glow on dialogs, sheets or popovers. They are above, not hot.",
+      "Don't introduce a fourth surface tone, a heavier border, or a coloured left-border accent.",
+      "Don't set Anton in sentence case, or let a heading run past two lines on a phone.",
+      "Don't let cream become a background or fill a large region — expand its reach into confirmation moments, not its area.",
+      "Don't animate the category indicator with scaleX; it deforms the pill's end caps.",
+      "Don't add a dark: variant. This is a single-theme system by choice — there is no light mode, and the dark custom variant left in the stylesheet is vestigial.",
+      "Don't reach for a shadow to express stacking. Use a tonal step."
+    ]
+  }
+}

@@ -9,7 +9,7 @@ export function LoadingScreen({ logoUrl: logoProp }: Props) {
       <div className="relative flex items-center justify-center">
         {/* Anillo pulsante de fondo */}
         <span
-          className="absolute h-28 w-28 rounded-full bg-primary/20 animate-ping"
+          className="karma-loader-ring absolute h-28 w-28 rounded-full bg-primary/20 animate-ping"
           style={{ animationDuration: "1.6s" }}
         />
         <span className="absolute h-20 w-20 rounded-full bg-primary/10" />
@@ -29,7 +29,7 @@ export function LoadingScreen({ logoUrl: logoProp }: Props) {
             <img
               src={logoUrl}
               alt="Karma"
-              className="absolute inset-0 w-full h-full object-contain"
+              className="karma-loader-fill absolute inset-0 w-full h-full object-contain"
               style={{
                 animation: "karma-fill 1.6s cubic-bezier(0.4, 0, 0.2, 1) forwards",
               }}

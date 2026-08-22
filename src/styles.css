@@ -38,48 +38,67 @@
   --color-ring: var(--ring);
   --color-brand: var(--brand);
   --color-brand-foreground: var(--brand-foreground);
+  --color-brand-bright: var(--brand-bright);
   --color-gold: var(--gold);
   --color-cream: var(--cream);
   --font-display: "Anton", system-ui, sans-serif;
   --font-sans: "Barlow", system-ui, sans-serif;
 }
 
+/*
+  Los valores OKLCH de abajo están verificados contra los hex de marca: cada
+  comentario es el color que realmente se pinta, no una aproximación. El rojo
+  vive en tres papeles distintos porque uno solo no puede pasar AA en todos:
+
+    --brand         #FC0025  identidad: atmósfera, degradado, halo del loader.
+    --primary       #EC0022  relleno: botones y estados activos. Es 0.03 de
+                             luminosidad más bajo que la marca — indistinguible
+                             al ojo — y con eso el texto blanco encima llega a
+                             4.56:1 en vez de quedarse en 4.06:1.
+    --brand-bright  #FE2531  tipografía roja sobre fondo oscuro (precios,
+                             títulos, errores): 5.13:1 sobre el fondo y 4.59:1
+                             sobre las tarjetas. El rojo de marca se queda en
+                             4.29:1 sobre tarjeta y no pasa.
+*/
 :root {
   --radius: 0.5rem;
 
   /* Brand — Karma */
-  --brand: oklch(0.53 0.27 25);             /* #FC0025 rojo Karma */
+  --brand: oklch(0.624 0.254 25.9);         /* #FC0025 rojo Karma */
   --brand-foreground: oklch(1 0 0);
-  --gold: oklch(0.91 0.07 96);              /* #E9E5A0 crema */
-  --cream: oklch(0.91 0.07 96);             /* #E9E5A0 crema */
+  --brand-bright: oklch(0.64 0.244 25.9);   /* #FE2531 rojo para texto */
+  --gold: oklch(0.909 0.088 105.2);         /* #E9E5A0 crema */
+  --cream: oklch(0.909 0.088 105.2);        /* #E9E5A0 crema */
 
-  --background: oklch(0.08 0 0);            /* #0D0D0D negro */
+  --background: oklch(0.159 0 0);           /* #0D0D0D negro */
   --foreground: oklch(1 0 0);               /* blanco */
 
-  --card: oklch(0.14 0 0);                  /* #1A1A1A */
+  --card: oklch(0.218 0 0);                 /* #1A1A1A */
   --card-foreground: oklch(1 0 0);
 
-  --popover: oklch(0.14 0 0);
+  --popover: oklch(0.218 0 0);
   --popover-foreground: oklch(1 0 0);
 
-  --primary: oklch(0.53 0.27 25);           /* #FC0025 rojo Karma */
+  --primary: oklch(0.594 0.242 25.9);       /* #EC0022 relleno */
   --primary-foreground: oklch(1 0 0);
 
-  --secondary: oklch(0.91 0.07 96);         /* #E9E5A0 crema */
-  --secondary-foreground: oklch(0.08 0 0);
+  --secondary: oklch(0.909 0.088 105.2);    /* #E9E5A0 crema */
+  --secondary-foreground: oklch(0.159 0 0);
 
-  --muted: oklch(0.20 0 0);
-  --muted-foreground: oklch(0.65 0 0);
+  --muted: oklch(0.26 0 0);
+  --muted-foreground: oklch(0.68 0 0);
 
-  --accent: oklch(0.53 0.27 25);
+  --accent: oklch(0.594 0.242 25.9);
   --accent-foreground: oklch(1 0 0);
 
-  --destructive: oklch(0.53 0.27 25);
+  --destructive: oklch(0.594 0.242 25.9);
   --destructive-foreground: oklch(1 0 0);
 
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 10%);
-  --ring: oklch(0.53 0.27 25);
+  --border: oklch(1 0 0 / 16%);
+  --input: oklch(1 0 0 / 14%);
+  /* Crema, no rojo: un anillo rojo sobre un botón rojo es invisible.
+     Sobre el fondo llega a 14.97:1 y sobre las tarjetas a 13.40:1. */
+  --ring: oklch(0.909 0.088 105.2);
 
   --shadow-card: 0 4px 20px -2px color-mix(in oklab, var(--brand) 30%, transparent);
   --shadow-soft: 0 2px 10px -2px color-mix(in oklab, var(--brand) 20%, transparent);
@@ -92,15 +111,151 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    /*
+      El degradado vive en body::before, no aquí:
+      `background-attachment: fixed` obliga a repintar el viewport entero en
+      cada frame de scroll y en Safari móvil eso se ve. Una capa `position:
+      fixed` da el mismo efecto sin el repintado.
+    */
+    position: relative;
+  }
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
     background-image:
       radial-gradient(at 0% 0%, color-mix(in oklab, var(--brand) 12%, transparent) 0px, transparent 55%),
       radial-gradient(at 100% 100%, color-mix(in oklab, var(--brand) 8%, transparent) 0px, transparent 55%);
-    background-attachment: fixed;
   }
   h1, h2, h3, .font-display { font-family: var(--font-display); letter-spacing: 0.02em; text-transform: uppercase; }
+
+  /*
+    Superficies que pinta el navegador. Vienen con los valores de fábrica de
+    Chrome y Safari, que no pertenecen a ningún sistema de diseño: selección
+    azul, cursor negro, barras de scroll claras. Aquí pasan a la paleta.
+  */
+  ::selection {
+    background-color: color-mix(in oklab, var(--brand) 70%, transparent);
+    color: oklch(1 0 0);
+  }
+  html {
+    scrollbar-color: color-mix(in oklab, oklch(1 0 0) 22%, transparent) transparent;
+    -webkit-tap-highlight-color: color-mix(in oklab, var(--brand) 25%, transparent);
+  }
+  input, textarea { caret-color: var(--color-brand-bright); }
+  a { text-underline-offset: 0.2em; }
+
+  /*
+    Los precios son cifras que se comparan en columna (carrito, desglose,
+    totales). Con cifras proporcionales los dígitos bailan de fila en fila.
+  */
+  .tabular { font-variant-numeric: tabular-nums; }
+}
+
+/*
+  Movimiento.
+
+  El momento con autoría es uno solo: el logo del loader llenándose de color de
+  abajo hacia arriba, como una jarra. Todo lo demás es acuse de recibo — el
+  indicador que sigue a la categoría tocada, los botones que responden al dedo.
+
+  Con `prefers-reduced-motion` no se apaga todo: se quita el desplazamiento y se
+  conserva lo que informa. El loader sigue latiendo en opacidad (si no, no
+  parece que esté cargando), el indicador sigue marcando la categoría activa
+  pero salta en vez de deslizarse, y los cambios de color se mantienen intactos.
+*/
+@layer base {
+  .slider-indicator {
+    transition:
+      transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
+      width 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .slider-indicator {
+      transition: none;
+    }
+
+    /* El relleno del logo pasa de recorrido espacial a pulso de opacidad:
+       sigue comunicando "cargando" sin barrido vertical. */
+    .karma-loader-fill {
+      animation: karma-pulse 1.8s ease-in-out infinite !important;
+      clip-path: none !important;
+    }
+    .karma-loader-ring {
+      animation: karma-pulse 1.8s ease-in-out infinite !important;
+      transform: none !important;
+    }
+
+    /* Sin saltos de escala ni de posición al pasar el puntero; el cambio de
+       color y el anillo de foco siguen respondiendo igual. */
+    .hover\:scale-105:hover,
+    .hover\:scale-110:hover,
+    .group:hover .group-hover\:scale-105,
+    .hover\:-translate-y-0\.5:hover {
+      transform: none !important;
+    }
+  }
+}
+
+/*
+  Documento legal. Reemplaza a `prose prose-slate dark:prose-invert`, que no
+  hacía nada: el plugin @tailwindcss/typography nunca se instaló y `.dark`
+  nunca se aplica. Sin él, y con el preflight de Tailwind poniendo `margin: 0`
+  en todo, los párrafos quedaban pegados unos a otros.
+
+  Texto claro sobre negro: un poco más de interlínea y de tracking de lo que
+  pediría el mismo cuerpo en claro, porque el texto en negativo "florece" y las
+  líneas se leen más apretadas de lo que están.
+*/
+@layer components {
+  .legal-prose {
+    /* ~65 caracteres: el rango cómodo de lectura. max-w-3xl daba casi 90. */
+    max-width: 34rem;
+    font-size: 1rem;
+    line-height: 1.75;
+    letter-spacing: 0.006em;
+    color: var(--color-foreground);
+  }
+  .legal-prose p { margin-block: 0 1.25em; }
+  .legal-prose ul { margin-block: 0 1.25em; }
+  .legal-prose li { margin-block-end: 0.5em; }
+  .legal-prose li::marker { color: var(--color-muted-foreground); }
+  /* Más aire encima que debajo: el título pertenece a lo que sigue. */
+  .legal-prose h2 { margin-block: 2.5em 0.75em; }
+  .legal-prose h2:first-of-type { margin-block-start: 1.5em; }
+  .legal-prose strong { font-weight: 600; }
+  .legal-prose > :last-child { margin-block-end: 0; }
+}
+
+@keyframes karma-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
 }
 
 @layer utilities {
+  /* Anillo de foco único para los controles hechos a mano (pills, steppers,
+     el botón flotante). El desplazamiento lo separa del relleno rojo, donde
+     un anillo sin offset se perdería contra el propio botón. */
+  /*
+     `outline`, no `box-shadow`. Ambos se pintan fuera de la caja del elemento,
+     pero el box-shadow no se podía recuperar cuando un ancestro recorta con
+     overflow-hidden — que es justo el caso del botón de la foto dentro de la
+     tarjeta de producto. `outline` además sobrevive al modo de contraste
+     forzado, donde un box-shadow simplemente desaparece.
+  */
+  .focus-ring:focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+  /* Para controles cuyo ancestro recorta: el anillo se dibuja hacia adentro,
+     así el recorte no tiene nada que borrar. */
+  .focus-ring-inset:focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: -3px;
+  }
   .shadow-card { box-shadow: var(--shadow-card); }
   .shadow-soft { box-shadow: var(--shadow-soft); }
   .bg-gradient-brand { background-image: var(--gradient-brand); }

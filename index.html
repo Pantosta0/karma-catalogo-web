@@ -2,18 +2,61 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!--
+      Estas etiquetas son las que leen Google, WhatsApp e Instagram al compartir
+      el link. La app es un SPA estático: el HTML se sirve tal cual, así que el
+      <head> de las rutas (HeadContent) solo actualiza la pestaña ya abierta y
+      NO cambia lo que ve un crawler. Esta es la única fuente de verdad para
+      previsualizaciones — si cambia el nombre o el dominio, se edita aquí.
+    -->
     <title>Karma — Menú</title>
-    <meta name="description" content="Sabes lo que hiciste. Te lo mereces hoy. Karma, restaurante de comida rápida y asados." />
-    <meta property="og:title" content="Karma" />
-    <meta property="og:description" content="Sabes lo que hiciste. Te lo mereces hoy." />
+    <meta name="description" content="Sabes lo que hiciste. Te lo mereces hoy. Hamburguesas y asados con pedido directo por WhatsApp." />
+    <link rel="canonical" href="https://karmaclub.food/" />
+
+    <meta property="og:site_name" content="Karma" />
+    <meta property="og:title" content="Karma — Menú" />
+    <meta property="og:description" content="Sabes lo que hiciste. Te lo mereces hoy. Pide directo por WhatsApp." />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://karmaclub.food/" />
+    <meta property="og:locale" content="es_CO" />
+    <meta property="og:image" content="https://karmaclub.food/og-image.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Karma" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Karma — Menú" />
+    <meta name="twitter:description" content="Sabes lo que hiciste. Te lo mereces hoy. Pide directo por WhatsApp." />
+    <meta name="twitter:image" content="https://karmaclub.food/og-image.jpg" />
+
+    <meta name="theme-color" content="#0D0D0D" />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!--
+      La hoja de Google Fonts se carga sin bloquear el primer render: el truco
+      media="print" la baja con prioridad baja y onload la activa. Con
+      display=swap el texto sale de inmediato en la tipografía de respaldo.
+    -->
     <link
-      rel="stylesheet"
+      rel="preload"
+      as="style"
       href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow:wght@400;500;600;700&display=swap"
     />
+    <link
+      rel="stylesheet"
+      media="print"
+      onload="this.media='all';this.onload=null;"
+      href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow:wght@400;500;600;700&display=swap"
+    />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow:wght@400;500;600;700&display=swap"
+      />
+    </noscript>
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   </head>

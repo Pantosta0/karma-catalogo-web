@@ -6,6 +6,7 @@ import { compressImage } from "@/lib/image";
 import { LoadingScreen } from "@/components/LoadingScreen";
 import { hashPassword, verifyPassword, isHashed } from "@/lib/crypto";
 import { formatCOP } from "@/lib/cart";
+import { applyPercent } from "@/lib/pricing";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,6 +31,24 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Plus, Pencil, Trash2, LogOut, Store, Tag, ImageOff, ArrowLeft, X, Megaphone, Clock, Ticket, Hash } from "lucide-react";
+import { toast } from "sonner";
+
+const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
+
+/** Rechaza archivos por encima del límite y explica el tamaño real. */
+function rejectIfTooLarge(f: File): boolean {
+  if (f.size <= MAX_UPLOAD_BYTES) return false;
+  toast.error("Esa imagen pesa demasiado", {
+    description: `Pesa ${(f.size / 1024 / 1024).toFixed(1)} MB y el máximo son 15 MB. Recórtala o expórtala con menos calidad.`,
+  });
+  return true;
+}
+
+function toastImageFailed() {
+  toast.error("No pudimos procesar la imagen", {
+    description: "Puede estar dañada o en un formato que el navegador no abre. Prueba con un JPG o PNG.",
+  });
+}
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -55,14 +74,25 @@ function AdminPage() {
     <div className="min-h-screen">
       <header className="sticky top-0 z-20 bg-card border-b border-border">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-          <Link to="/" className="text-muted-foreground hover:text-primary" aria-label="Volver">
+          <Link
+            to="/"
+            className="focus-ring rounded text-muted-foreground hover:text-brand-bright"
+            aria-label="Volver"
+          >
             <ArrowLeft className="h-5 w-5" />
           </Link>
           {(state.config.logoRect || state.config.logoSquare) && (
-            <img src={state.config.logoRect || state.config.logoSquare} alt="" className="h-9 w-auto" />
+            <span className="flex h-9 min-w-16 items-center shrink-0">
+              <img
+                src={state.config.logoRect || state.config.logoSquare}
+                alt=""
+                decoding="async"
+                className="h-full w-auto max-w-32 object-contain object-left"
+              />
+            </span>
           )}
           <div>
-            <h1 className="font-display font-bold text-primary leading-none">Panel de administración</h1>
+            <h1 className="font-display font-bold text-brand-bright leading-none">Panel de administración</h1>
             <p className="text-xs text-muted-foreground">{state.config.nombre}</p>
           </div>
           <div className="flex-1" />
@@ -87,7 +117,7 @@ function AdminPage() {
             <button
               key={k}
               onClick={() => setTab(k)}
-              className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition flex items-center gap-2 ${
+              className={`focus-ring px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition flex items-center gap-2 ${
                 tab === k ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
               }`}
             >
@@ -137,8 +167,12 @@ function LoginScreen() {
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="w-full max-w-sm bg-card rounded-2xl shadow-card border border-border p-6">
         <div className="flex flex-col items-center mb-4">
-          <img src={logoUrl} alt="Logo" className="h-16 w-auto mb-2" />
-          <h1 className="font-display text-xl font-bold text-primary">Administración</h1>
+          {logoUrl && (
+            <span className="mb-2 flex h-16 min-w-16 items-center justify-center">
+              <img src={logoUrl} alt="" decoding="async" className="h-full w-auto max-w-40 object-contain" />
+            </span>
+          )}
+          <h1 className="font-display text-xl font-bold text-brand-bright">Administración</h1>
           <p className="text-sm text-muted-foreground">Ingresa tus credenciales</p>
         </div>
         <form onSubmit={submit} className="space-y-3">
@@ -150,11 +184,14 @@ function LoginScreen() {
             <Label htmlFor="p">Contraseña</Label>
             <Input id="p" type="password" value={pass} onChange={(e) => setPass(e.target.value)} />
           </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p className="text-sm text-brand-bright">{error}</p>}
           <Button type="submit" className="w-full bg-gradient-brand text-brand-foreground" size="lg">
             Entrar
           </Button>
-          <Link to="/" className="block text-center text-sm text-muted-foreground hover:text-primary">
+          <Link
+            to="/"
+            className="focus-ring rounded block text-center text-sm text-muted-foreground hover:text-brand-bright"
+          >
             ← Volver al catálogo
           </Link>
         </form>
@@ -204,7 +241,7 @@ function ProductsTab() {
                   <p className="font-semibold text-sm line-clamp-1">{p.nombre}</p>
                   <p className="text-xs text-muted-foreground">{catNames(p.categorias)}</p>
                 </div>
-                <p className="text-primary font-bold whitespace-nowrap">{formatCOP(p.precio)}</p>
+                <p className="text-brand-bright font-bold whitespace-nowrap">{formatCOP(p.precio)}</p>
               </div>
               <div className="flex items-center justify-between mt-3">
                 <label className="flex items-center gap-2 text-xs">
@@ -227,7 +264,7 @@ function ProductsTab() {
                     size="icon"
                     variant="ghost"
                     onClick={() => setToDelete(p)}
-                    className="text-destructive hover:text-destructive"
+                    className="text-brand-bright hover:text-brand-bright"
                     aria-label="Eliminar"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -326,13 +363,8 @@ function ProductFormDialog({
 
   const handleFile = (f: File) => {
     // Límite generoso — la compresión reduce el tamaño real antes de guardar
-    if (f.size > 15 * 1024 * 1024) {
-      alert("La imagen es demasiado grande (máx 15 MB)");
-      return;
-    }
-    compressImage(f, 900, "jpeg", 0.82)
-      .then(setFoto)
-      .catch(() => alert("No se pudo procesar la imagen"));
+    if (rejectIfTooLarge(f)) return;
+    compressImage(f, 900, "jpeg", 0.82).then(setFoto).catch(toastImageFailed);
   };
 
   const submit = () => {
@@ -442,7 +474,7 @@ function ProductFormDialog({
                     key={c.id}
                     type="button"
                     onClick={() => toggleCat(c.id)}
-                    className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                    className={`focus-ring px-3 py-1.5 rounded-full text-sm border transition-colors ${
                       active
                         ? "bg-primary text-primary-foreground border-primary"
                         : "bg-card text-foreground border-border hover:bg-muted"
@@ -454,7 +486,7 @@ function ProductFormDialog({
               })}
             </div>
             {categorias.length === 0 && (
-              <p className="text-xs text-destructive mt-1">Selecciona al menos una categoría.</p>
+              <p className="text-xs text-brand-bright mt-1">Selecciona al menos una categoría.</p>
             )}
           </div>
           <label className="flex items-center justify-between bg-muted rounded-lg p-3">
@@ -465,7 +497,7 @@ function ProductFormDialog({
           {/* Descuento por tiempo limitado */}
           <div className="pt-3 border-t border-border space-y-2">
             <p className="text-sm font-semibold flex items-center gap-1.5">
-              <Ticket className="h-4 w-4 text-primary" /> Descuento (opcional)
+              <Ticket className="h-4 w-4 text-brand-bright" /> Descuento (opcional)
             </p>
             <div className="flex items-center gap-3">
               <div className="flex-1">
@@ -495,10 +527,11 @@ function ProductFormDialog({
               </div>
             </div>
             {parseInt(descuentoPct, 10) > 0 && (
-              <p className="text-xs text-primary">
+              <p className="text-xs text-brand-bright">
                 Precio con descuento:{" "}
-                {new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 })
-                  .format(Math.round((parseInt(precio, 10) || 0) * (1 - (parseInt(descuentoPct, 10) || 0) / 100)))}
+                {/* Misma función que usa el catálogo: la vista previa no puede
+                    calcular el descuento por su cuenta y desviarse. */}
+                {formatCOP(applyPercent(parseInt(precio, 10) || 0, parseInt(descuentoPct, 10) || 0))}
                 {descuentoHasta ? ` hasta ${descuentoHasta}` : " (sin fecha límite)"}
               </p>
             )}
@@ -532,11 +565,18 @@ function CategoriesTab() {
   };
 
   const remove = (c: Category) => {
-    if (state.productos.some((p) => p.categorias.includes(c.id))) {
-      alert("No se puede eliminar: hay productos en esta categoría.");
+    const enUso = state.productos.filter((p) => p.categorias.includes(c.id));
+    if (enUso.length > 0) {
+      toast.error(`«${c.nombre}» todavía está en uso`, {
+        description:
+          enUso.length === 1
+            ? `"${enUso[0].nombre}" pertenece a esta categoría. Cámbiala de categoría para poder eliminarla.`
+            : `${enUso.length} productos pertenecen a esta categoría. Cámbialos de categoría para poder eliminarla.`,
+      });
       return;
     }
     update((s) => ({ ...s, categorias: s.categorias.filter((x) => x.id !== c.id) }));
+    toast.success(`Categoría «${c.nombre}» eliminada`);
   };
 
   return (
@@ -562,7 +602,7 @@ function CategoriesTab() {
               size="icon"
               variant="ghost"
               onClick={() => remove(c)}
-              className="text-destructive"
+              className="text-brand-bright"
               aria-label="Eliminar"
             >
               <X className="h-4 w-4" />
@@ -584,7 +624,9 @@ function BusinessTab() {
   const [logoSquare, setLogoSquare] = useState(state.config.logoSquare);
   const [logoRect, setLogoRect] = useState(state.config.logoRect);
   const [seoDescription, setSeoDescription] = useState(state.config.seoDescription);
-  const [ogImage, setOgImage] = useState(state.config.ogImage ?? "");
+  // Ya no se edita desde el panel (ver nota en la sección SEO), pero se
+  // conserva para no borrar el valor guardado en la base.
+  const ogImage = state.config.ogImage ?? "";
   const [newPass, setNewPass] = useState("");
   const [confirmPass, setConfirmPass] = useState("");
   const [passError, setPassError] = useState("");
@@ -614,10 +656,7 @@ function BusinessTab() {
   const fileRectRef = useRef<HTMLInputElement>(null);
 
   const handleLogo = (f: File, type: "square" | "rect") => {
-    if (f.size > 15 * 1024 * 1024) {
-      alert("El archivo es demasiado grande (máx 15 MB)");
-      return;
-    }
+    if (rejectIfTooLarge(f)) return;
     // Logos: PNG para mantener transparencia; cuadrado max 400px, rect max 800px
     const maxPx = type === "square" ? 400 : 800;
     compressImage(f, maxPx, "png")
@@ -625,7 +664,7 @@ function BusinessTab() {
         if (type === "square") setLogoSquare(url);
         else setLogoRect(url);
       })
-      .catch(() => alert("No se pudo procesar el logo"));
+      .catch(toastImageFailed);
   };
 
   const guardar = async () => {
@@ -837,7 +876,10 @@ function BusinessTab() {
 
       {/* ── SEO ─────────────────────────────────────────────────────────────── */}
       <div className="pt-2 border-t border-border">
-        <p className="text-sm font-semibold mb-3">SEO / Redes sociales</p>
+        <p className="text-sm font-semibold mb-1">SEO / Redes sociales</p>
+        <p className="text-xs text-muted-foreground mb-3">
+          Lo que ve quien abre el menú en su navegador.
+        </p>
         <div className="space-y-3">
           <div>
             <Label htmlFor="seo-title">Título de la pestaña</Label>
@@ -845,9 +887,11 @@ function BusinessTab() {
               id="seo-title"
               value={`${nombre || "Karma"} — Menú`}
               readOnly
-              className="opacity-60 cursor-not-allowed"
+              tabIndex={-1}
+              aria-describedby="seo-title-hint"
+              className="opacity-60"
             />
-            <p className="text-xs text-muted-foreground mt-1">
+            <p id="seo-title-hint" className="text-xs text-muted-foreground mt-1">
               Se genera automáticamente desde el nombre del negocio.
             </p>
           </div>
@@ -860,21 +904,25 @@ function BusinessTab() {
               value={seoDescription}
               onChange={(e) => setSeoDescription(e.target.value.slice(0, 160))}
               rows={3}
-              placeholder="Breve descripción que aparece en Google y al compartir en redes sociales."
+              placeholder="Breve descripción del negocio, en una o dos frases."
             />
           </div>
-          <div>
-            <Label htmlFor="og-image">Imagen para redes sociales (og:image)</Label>
-            <Input
-              id="og-image"
-              value={ogImage}
-              onChange={(e) => setOgImage(e.target.value)}
-              placeholder="https://tudominio.com/imagen.jpg"
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              URL pública de la imagen que aparece al compartir el link en WhatsApp, Instagram, etc. Mínimo 1200×630px recomendado.
-            </p>
-          </div>
+        </div>
+
+        {/*
+          La previsualización del link (imagen + texto en WhatsApp/Instagram) la
+          arma un robot que lee el HTML publicado sin ejecutar la app, así que no
+          puede salir de esta configuración. Decirlo aquí en vez de ofrecer un
+          campo que no hace nada.
+        */}
+        <div className="mt-4 rounded-lg border border-border bg-muted/40 p-3">
+          <p className="text-xs font-semibold mb-1">Previsualización al compartir el link</p>
+          <p className="text-xs text-muted-foreground">
+            La imagen y el texto que aparecen al pegar el link en WhatsApp o Instagram
+            están fijos en el sitio publicado (<code className="text-foreground">index.html</code> y{" "}
+            <code className="text-foreground">og-image.jpg</code>). No se pueden cambiar
+            desde aquí: hay que editarlos y volver a publicar.
+          </p>
         </div>
       </div>
 
@@ -901,7 +949,7 @@ function BusinessTab() {
               onChange={(e) => setConfirmPass(e.target.value)}
             />
           </div>
-          {passError && <p className="text-sm text-destructive">{passError}</p>}
+          {passError && <p className="text-sm text-brand-bright">{passError}</p>}
         </div>
       </div>
 
@@ -909,7 +957,7 @@ function BusinessTab() {
         <Button onClick={guardar} className="bg-gradient-brand text-brand-foreground">
           Guardar cambios
         </Button>
-        {saved && <span className="text-sm text-primary font-semibold">✓ Guardado</span>}
+        {saved && <span className="text-sm text-brand-bright font-semibold">✓ Guardado</span>}
       </div>
     </div>
   );
@@ -926,7 +974,7 @@ function PromosTab() {
           <button
             key={t}
             onClick={() => setSubTab(t)}
-            className={`px-4 py-2 rounded-full text-sm font-semibold transition ${
+            className={`focus-ring px-4 py-2 rounded-full text-sm font-semibold transition ${
               subTab === t ? "bg-primary text-primary-foreground" : "bg-card border border-border text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -997,7 +1045,7 @@ function PopupsSubTab() {
                     <Pencil className="h-4 w-4" />
                   </Button>
                   <Button size="icon" variant="ghost" onClick={() => setToDelete(p)}
-                    className="text-destructive hover:text-destructive">
+                    className="text-brand-bright hover:text-brand-bright">
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
@@ -1126,10 +1174,10 @@ function PromoFormDialog({
                   hidden
                   onChange={(e) => {
                     const f = e.target.files?.[0];
-                    if (!f) return;
+                    if (!f || rejectIfTooLarge(f)) return;
                     compressImage(f, 800, "jpeg", 0.85)
                       .then(setImagen)
-                      .catch(() => alert("Error al procesar imagen"));
+                      .catch(toastImageFailed);
                   }}
                 />
               </div>
@@ -1220,11 +1268,11 @@ function CodesSubTab() {
             return (
               <div key={c.id} className="bg-card border border-border rounded-xl p-4 flex gap-3">
                 <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-primary/10 shrink-0">
-                  <Hash className="h-5 w-5 text-primary" />
+                  <Hash className="h-5 w-5 text-brand-bright" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-display font-bold tracking-widest text-primary">{c.code}</span>
+                    <span className="font-display font-bold tracking-widest text-brand-bright">{c.code}</span>
                     <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${status.cls}`}>{status.label}</span>
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -1242,7 +1290,7 @@ function CodesSubTab() {
                   <Button size="icon" variant="ghost" onClick={() => setEditing(c)}>
                     <Pencil className="h-4 w-4" />
                   </Button>
-                  <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive"
+                  <Button size="icon" variant="ghost" className="text-brand-bright hover:text-brand-bright"
                     onClick={() => setToDelete(c)}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -1389,7 +1437,7 @@ function CodeFormDialog({
                   key={t}
                   type="button"
                   onClick={() => setDescTipo(t)}
-                  className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition ${
+                  className={`focus-ring flex-1 py-2 rounded-lg text-sm font-semibold border transition ${
                     descTipo === t ? "bg-primary text-primary-foreground border-primary" : "bg-card border-border text-muted-foreground"
                   }`}
                 >

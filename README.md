@@ -43,43 +43,88 @@ Obtén estos valores en [supabase.com](https://supabase.com) → tu proyecto →
 Crea las siguientes tablas en el **SQL Editor** de tu proyecto:
 
 ```sql
--- Configuración del negocio
+-- Configuración del negocio (una sola fila, id = 1)
 create table config (
-  id integer primary key,
-  nombre text,
-  whatsapp text,
-  logo text,
-  admin_user text,
-  admin_pass text
+  id              integer primary key,
+  nombre          text,
+  whatsapp        text,          -- internacional sin "+", ej: 573001112233
+  logo_square     text,          -- data URL — loading, login y favicon
+  logo_rect       text,          -- data URL — header
+  seo_description text,
+  og_image        text,
+  delivery_fee    numeric default 5000,
+  schedule        jsonb,         -- 7 entradas [0=Dom .. 6=Sáb] {open, from, to}
+  admin_user      text,
+  admin_pass      text           -- hash SHA-256 (ver aviso de seguridad abajo)
 );
 
 -- Categorías
 create table categorias (
-  id text primary key,
+  id     text primary key,
   nombre text,
-  orden integer default 0
+  orden  integer default 0
 );
 
 -- Productos (categorias es un array de IDs)
 create table productos (
-  id text primary key,
-  nombre text,
-  descripcion text,
-  precio numeric,
-  categorias text[],
-  foto text,
-  disponible boolean default true
+  id              text primary key,
+  nombre          text,
+  descripcion     text,
+  precio          numeric,
+  categorias      text[],
+  foto            text,            -- data URL base64 o URL
+  disponible      boolean default true,
+  descuento_pct   integer default 0,
+  descuento_hasta text default ''  -- "YYYY-MM-DD" o "" si no vence
 );
 
--- Deshabilitar RLS (la app usa la anon key para leer y escribir)
-alter table config disable row level security;
+-- Popups promocionales
+create table promos (
+  id          text primary key,
+  activo      boolean default true,
+  titulo      text,
+  descripcion text,
+  imagen      text,
+  desde       text,   -- "YYYY-MM-DD"
+  hasta       text
+);
+
+-- Códigos de descuento
+create table codigos (
+  id              text primary key,
+  code            text,
+  descripcion     text,
+  descuento_tipo  text,    -- 'porcentaje' | 'fijo'
+  descuento_valor numeric,
+  limite_usos     boolean default false,
+  usos_maximos    integer default 0,
+  usos_actuales   integer default 0,
+  limite_tiempo   boolean default false,
+  desde           text,
+  hasta           text,
+  activo          boolean default true
+);
+
+alter table config     disable row level security;
 alter table categorias disable row level security;
-alter table productos disable row level security;
+alter table productos  disable row level security;
+alter table promos     disable row level security;
+alter table codigos    disable row level security;
 
 -- Fila inicial de config
-insert into config (id, nombre, whatsapp, logo, admin_user, admin_pass)
-values (1, 'Karma', '573001234567', '', 'kevin', 'Karma_2026_!');
+insert into config (id, nombre, whatsapp, admin_user, admin_pass, delivery_fee)
+values (1, 'Karma', '573001234567', 'kevin', '', 5000);
 ```
+
+`promos` y `codigos` son opcionales: si no existen, la app las ignora y el resto
+sigue funcionando.
+
+> **Aviso de seguridad.** Con RLS deshabilitado y `select("*")` sobre `config`,
+> `admin_user` y `admin_pass` viajan al navegador de **cualquier** visitante del
+> menú, y la verificación de login ocurre en el cliente. El hash de la contraseña
+> es legible por cualquiera. Antes de promocionar el sitio hay que mover la
+> autenticación a Supabase Auth, o crear una política RLS que excluya esas dos
+> columnas del rol `anon`.
 
 ## Desarrollo local
 
@@ -96,19 +141,24 @@ La app queda en `http://localhost:5173`.
 npm run build   # genera la carpeta dist/
 ```
 
-### Cloudflare Pages
+### Cloudflare Workers
+
+El deploy real lo hace `.github/workflows/deploy.yml` en cada push a `master`,
+usando `wrangler.toml`. No es Cloudflare Pages: es un Worker que sirve `dist/`
+como assets estáticos (`worker.ts`) y fuerza `no-cache` sobre el HTML para que
+un deploy nuevo se vea de inmediato.
 
 | Ajuste | Valor |
 |---|---|
-| Build command | `npm run build` |
-| Build output directory | `dist` |
-| Node.js version | `20` |
-| Variable `VITE_SUPABASE_URL` | URL de tu proyecto Supabase |
-| Variable `VITE_SUPABASE_ANON_KEY` | Anon key de tu proyecto Supabase |
+| Entrada del Worker | `worker.ts` |
+| Directorio de assets | `dist` |
+| Routing SPA | `not_found_handling = "single-page-application"` en `wrangler.toml` |
+| Dominio | `karmaclub.food` (custom domain, ya configurado) |
+| Node.js | `20` |
+| Secretos | `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` en el environment `Deploy` |
 
-El archivo `public/_redirects` ya está incluido para que el SPA funcione correctamente en todas las rutas.
-
-Para conectar tu dominio: Cloudflare Pages → tu proyecto → **Custom domains**. Si el dominio ya está en Cloudflare lo detecta y agrega el CNAME automáticamente.
+El repo también incluye un `netlify.toml` con el fallback SPA equivalente, por si
+se despliega en Netlify en vez de Cloudflare.
 
 ## Estructura del proyecto
 
