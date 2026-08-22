@@ -17,6 +17,8 @@ export type Product = {
   disponible: boolean;
   descuento_pct: number;   // 0-100 %, 0 = sin descuento
   descuento_hasta: string; // "YYYY-MM-DD" o "" si no vence
+  /** Abre la portada. Ver `src/routes/index.tsx`. */
+  destacado: boolean;
 };
 
 export type PromoCode = {
@@ -50,6 +52,8 @@ export type BusinessConfig = {
   ogImage: string;         // URL absoluta de imagen para og:image (redes sociales)
   deliveryFee: number;     // costo de domicilio en COP
   schedule: DaySchedule[]; // 7 entradas [0=Dom, 1=Lun, ..., 6=Sáb]
+  direccion: string;       // dirección física; "" = no mostrar la línea
+  instagram: string;       // usuario pelado, sin @ ni URL (ej: "karma.food")
 };
 
 export type Promo = {
@@ -102,6 +106,8 @@ export const DEFAULT_STATE: AppState = {
     ogImage: "",
     deliveryFee: 5000,
     schedule: DEFAULT_SCHEDULE,
+    direccion: "",
+    instagram: "",
   },
   categorias: DEFAULT_CATEGORIES,
   productos: [
@@ -115,6 +121,7 @@ export const DEFAULT_STATE: AppState = {
       disponible: true,
       descuento_pct: 0,
       descuento_hasta: "",
+      destacado: false,
     },
     {
       id: "p2",
@@ -126,6 +133,7 @@ export const DEFAULT_STATE: AppState = {
       disponible: true,
       descuento_pct: 0,
       descuento_hasta: "",
+      destacado: false,
     },
     {
       id: "p3",
@@ -137,6 +145,7 @@ export const DEFAULT_STATE: AppState = {
       disponible: true,
       descuento_pct: 0,
       descuento_hasta: "",
+      destacado: false,
     },
     {
       id: "p4",
@@ -148,6 +157,7 @@ export const DEFAULT_STATE: AppState = {
       disponible: true,
       descuento_pct: 0,
       descuento_hasta: "",
+      destacado: false,
     },
     {
       id: "p5",
@@ -159,6 +169,7 @@ export const DEFAULT_STATE: AppState = {
       disponible: true,
       descuento_pct: 0,
       descuento_hasta: "",
+      destacado: false,
     },
   ],
   promos: [],
@@ -187,6 +198,8 @@ function normalizeState(s: AppState): AppState {
       seoDescription: s.config.seoDescription ?? "",
       ogImage: s.config.ogImage ?? "",
       schedule: s.config.schedule ?? DEFAULT_SCHEDULE,
+      direccion: s.config.direccion ?? "",
+      instagram: s.config.instagram ?? "",
     },
     // Un navegador que guardó el estado antes de la fase 3 trae categorías sin
     // `icono`; sin este relleno la cuadrícula del menú pinta undefined.
@@ -195,6 +208,7 @@ function normalizeState(s: AppState): AppState {
       ...p,
       descuento_pct: p.descuento_pct ?? 0,
       descuento_hasta: p.descuento_hasta ?? "",
+      destacado: p.destacado ?? false,
     })),
   };
 }
@@ -248,6 +262,10 @@ export async function loadStateFromSupabase(): Promise<AppState> {
       og_image: string;
       delivery_fee: number | null;
       schedule: DaySchedule[] | null;
+      // Opcionales en el tipo: si la fase 4 aún no se corrió, la fila llega sin
+      // estas columnas.
+      direccion?: string;
+      instagram?: string;
     };
 
     const categorias: Category[] = (catRes.data ?? []).map(
@@ -265,6 +283,7 @@ export async function loadStateFromSupabase(): Promise<AppState> {
       categorias: string[] | null; categoria_id: string | null;
       foto: string; disponible: boolean;
       descuento_pct?: number; descuento_hasta?: string;
+      destacado?: boolean;
     }) => ({
       id: p.id,
       nombre: p.nombre,
@@ -277,6 +296,7 @@ export async function loadStateFromSupabase(): Promise<AppState> {
       disponible: p.disponible,
       descuento_pct: p.descuento_pct ?? 0,
       descuento_hasta: p.descuento_hasta ?? "",
+      destacado: p.destacado ?? false,
     }));
 
     // Promos — tabla opcional, falla silenciosamente si no existe todavía
@@ -312,6 +332,8 @@ export async function loadStateFromSupabase(): Promise<AppState> {
           : Array.isArray(cached?.config?.schedule) && cached.config.schedule.length === 7
             ? cached.config.schedule
             : DEFAULT_SCHEDULE,
+        direccion: raw.direccion ?? cached?.config?.direccion ?? "",
+        instagram: raw.instagram ?? cached?.config?.instagram ?? "",
       },
       categorias,
       productos,
@@ -346,6 +368,8 @@ export async function saveStateToSupabase(state: AppState): Promise<void> {
       og_image: state.config.ogImage,
       delivery_fee: state.config.deliveryFee,
       schedule: state.config.schedule,
+      direccion: state.config.direccion ?? "",
+      instagram: state.config.instagram ?? "",
     });
 
     // Sincronizar categorías: eliminar las que ya no están, insertar/actualizar nuevas
@@ -380,6 +404,7 @@ export async function saveStateToSupabase(state: AppState): Promise<void> {
           disponible: p.disponible,
           descuento_pct: p.descuento_pct ?? 0,
           descuento_hasta: p.descuento_hasta ?? "",
+          destacado: p.destacado ?? false,
         }))
       );
     }

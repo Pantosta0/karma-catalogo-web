@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CATEGORY_ICONS, getCategoryIcon } from "@/lib/category-icons";
-import { Plus, Pencil, Trash2, LogOut, Store, Tag, ImageOff, ArrowLeft, X, Megaphone, Clock, Ticket, Hash } from "lucide-react";
+import { Plus, Pencil, Trash2, LogOut, Store, Tag, ImageOff, ArrowLeft, X, Megaphone, Clock, Ticket, Hash, Star, MapPin, Instagram } from "lucide-react";
 import { toast } from "sonner";
 
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024;
@@ -273,6 +273,26 @@ function ProductsTab() {
                   {p.disponible ? "Disponible" : "No disponible"}
                 </label>
                 <div className="flex gap-1">
+                  {/* Destacar sin abrir el diálogo: elegir con qué abre la
+                      portada es una decisión que se cambia seguido. */}
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() =>
+                      update((s) => ({
+                        ...s,
+                        productos: s.productos.map((x) =>
+                          x.id === p.id ? { ...x, destacado: !x.destacado } : x,
+                        ),
+                      }))
+                    }
+                    aria-label={p.destacado ? `Quitar ${p.nombre} de la portada` : `Destacar ${p.nombre} en la portada`}
+                    aria-pressed={p.destacado}
+                    title="Destacado en la portada"
+                    className={p.destacado ? "text-secondary" : "text-muted-foreground"}
+                  >
+                    <Star className={`h-4 w-4 ${p.destacado ? "fill-current" : ""}`} />
+                  </Button>
                   <Button size="icon" variant="ghost" onClick={() => setEditing(p)} aria-label="Editar">
                     <Pencil className="h-4 w-4" />
                   </Button>
@@ -357,6 +377,7 @@ function ProductFormDialog({
   const [disponible, setDisponible] = useState(product?.disponible ?? true);
   const [descuentoPct, setDescuentoPct] = useState<string>(product?.descuento_pct?.toString() ?? "0");
   const [descuentoHasta, setDescuentoHasta] = useState(product?.descuento_hasta ?? "");
+  const [destacado, setDestacado] = useState(product?.destacado ?? false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Sincronizar form cuando el diálogo abre o cambia el producto seleccionado
@@ -370,6 +391,7 @@ function ProductFormDialog({
       setDisponible(product?.disponible ?? true);
       setDescuentoPct(product?.descuento_pct?.toString() ?? "0");
       setDescuentoHasta(product?.descuento_hasta ?? "");
+      setDestacado(product?.destacado ?? false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, product?.id]);
@@ -408,6 +430,7 @@ function ProductFormDialog({
       disponible,
       descuento_pct: pct,
       descuento_hasta: descuentoHasta,
+      destacado,
     });
     onClose();
     setNombre("");
@@ -418,6 +441,7 @@ function ProductFormDialog({
     setDisponible(true);
     setDescuentoPct("0");
     setDescuentoHasta("");
+    setDestacado(false);
   };
 
   return (
@@ -525,6 +549,15 @@ function ProductFormDialog({
           <label className="flex items-center justify-between bg-muted rounded-lg p-3">
             <span className="text-sm font-medium">Disponible en el catálogo</span>
             <Switch checked={disponible} onCheckedChange={setDisponible} />
+          </label>
+          <label className="flex items-center justify-between bg-muted rounded-lg p-3">
+            <span className="text-sm font-medium">
+              Destacado en la portada
+              <span className="block text-xs font-normal text-muted-foreground">
+                Aparece en la página de inicio. Se muestran los primeros tres.
+              </span>
+            </span>
+            <Switch checked={destacado} onCheckedChange={setDestacado} />
           </label>
 
           {/* Descuento por tiempo limitado */}
@@ -724,6 +757,15 @@ function BusinessTab() {
     return first?.to ?? "22:00";
   });
   const [saved, setSaved] = useState(false);
+  const [direccion, setDireccion] = useState(state.config.direccion ?? "");
+  const [instagram, setInstagram] = useState(state.config.instagram ?? "");
+
+  // Los dos campos de la portada llegan asíncronos como todo lo demás: sin esto
+  // se quedan vacíos si el panel pintó antes de que Supabase respondiera.
+  useEffect(() => {
+    setDireccion(state.config.direccion ?? "");
+    setInstagram(state.config.instagram ?? "");
+  }, [state.config.direccion, state.config.instagram]);
 
   // Sincronizar estado local cuando state.config.schedule cambia (ej: carga desde Supabase)
   useEffect(() => {
@@ -794,6 +836,10 @@ function BusinessTab() {
         ogImage: ogImage.trim(),
         deliveryFee: Math.max(0, parseInt(deliveryFee, 10) || 0),
         schedule,
+        direccion: direccion.trim(),
+        // Guardado pelado: se acepta que peguen "@karma" o la URL entera y se
+        // reduce al usuario, porque la portada arma el enlace a partir de él.
+        instagram: instagram.trim().replace(/^@/, "").replace(/^https?:\/\/(www\.)?instagram\.com\//i, "").replace(/\/+$/, ""),
       },
     }));
     setSaved(true);
@@ -882,6 +928,42 @@ function BusinessTab() {
           Ej: 573001112233 (Colombia +57). Aquí llegarán los pedidos.
         </p>
       </div>
+
+      {/* Los dos campos que alimentan la portada. Ambos opcionales: si se dejan
+          vacíos, la portada simplemente no pinta esa línea. */}
+      <div>
+        <Label htmlFor="direccion" className="flex items-center gap-1.5">
+          <MapPin className="h-3.5 w-3.5 text-brand-bright" /> Dirección
+        </Label>
+        <Input
+          id="direccion"
+          value={direccion}
+          onChange={(e) => setDireccion(e.target.value)}
+          placeholder="Calle 00 #00-00, Barrio, Ciudad"
+          maxLength={120}
+        />
+        <p className="text-xs text-muted-foreground mt-1">
+          Se muestra en la página de inicio. Déjalo vacío si no atiendes en un local.
+        </p>
+      </div>
+      <div>
+        <Label htmlFor="instagram" className="flex items-center gap-1.5">
+          <Instagram className="h-3.5 w-3.5 text-brand-bright" /> Instagram
+        </Label>
+        <Input
+          id="instagram"
+          value={instagram}
+          onChange={(e) => setInstagram(e.target.value)}
+          placeholder="karma.food"
+          maxLength={60}
+          autoCapitalize="none"
+          autoCorrect="off"
+        />
+        <p className="text-xs text-muted-foreground mt-1">
+          Solo el usuario. Si pegas el @ o el link completo, se recorta al guardar.
+        </p>
+      </div>
+
       <div>
         <Label htmlFor="delivery-fee">Costo de domicilio (COP)</Label>
         <div className="flex items-center gap-2 mt-1">
