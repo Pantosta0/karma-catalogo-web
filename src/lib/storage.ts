@@ -66,7 +66,8 @@ export type AppState = {
   productos: Product[];
   promos: Promo[];
   codes: PromoCode[];
-  adminAuth: { user: string; pass: string };
+  /** Hay una sesión de Supabase Auth activa. Las credenciales ya no viven
+   *  en la tabla config: las gestiona Supabase Auth. */
   adminSession: boolean;
 };
 
@@ -160,7 +161,6 @@ export const DEFAULT_STATE: AppState = {
   ],
   promos: [],
   codes: [],
-  adminAuth: { user: "kevin", pass: "Karma_2026_!" },
   adminSession: false,
 };
 
@@ -211,7 +211,18 @@ function lsSave(state: AppState) {
 
 // ─── Supabase: Cargar ─────────────────────────────────────────────────────────
 
+/** ¿Hay sesión de Supabase Auth? Sustituye al flag en sessionStorage. */
+async function hasActiveSession(): Promise<boolean> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    return !!data.session;
+  } catch {
+    return false;
+  }
+}
+
 export async function loadStateFromSupabase(): Promise<AppState> {
+  const hasSession = await hasActiveSession();
   try {
     const [configRes, catRes, prodRes] = await Promise.all([
       supabase.from("config").select("*").eq("id", 1).single(),
@@ -222,7 +233,7 @@ export async function loadStateFromSupabase(): Promise<AppState> {
     if (configRes.error || catRes.error || prodRes.error) {
       console.warn("[Supabase] Error cargando datos, usando localStorage:", configRes.error || catRes.error || prodRes.error);
       const cached = normalizeState(lsLoad() ?? DEFAULT_STATE);
-      return { ...cached, adminSession: sessionStorage.getItem("karma_admin") === "1" };
+      return { ...cached, adminSession: await hasActiveSession() };
     }
 
     const raw = configRes.data as {
@@ -232,7 +243,6 @@ export async function loadStateFromSupabase(): Promise<AppState> {
       og_image: string;
       delivery_fee: number | null;
       schedule: DaySchedule[] | null;
-      admin_user: string; admin_pass: string;
     };
 
     const categorias: Category[] = (catRes.data ?? []).map((c: { id: string; nombre: string }) => ({
@@ -297,9 +307,7 @@ export async function loadStateFromSupabase(): Promise<AppState> {
       productos,
       promos,
       codes,
-      adminAuth: { user: raw.admin_user, pass: raw.admin_pass },
-      // Restaurar sesión desde sessionStorage (persiste en el tab, no en DB)
-      adminSession: sessionStorage.getItem("karma_admin") === "1",
+      adminSession: hasSession,
     };
 
     lsSave(state);
@@ -307,7 +315,7 @@ export async function loadStateFromSupabase(): Promise<AppState> {
   } catch (err) {
     console.warn("[Supabase] Excepción al cargar, usando localStorage:", err);
     const cached = normalizeState(lsLoad() ?? DEFAULT_STATE);
-    return { ...cached, adminSession: sessionStorage.getItem("karma_admin") === "1" };
+    return { ...cached, adminSession: await hasActiveSession() };
   }
 }
 
@@ -328,8 +336,6 @@ export async function saveStateToSupabase(state: AppState): Promise<void> {
       og_image: state.config.ogImage,
       delivery_fee: state.config.deliveryFee,
       schedule: state.config.schedule,
-      admin_user: state.adminAuth.user,
-      admin_pass: state.adminAuth.pass,
     });
 
     // Sincronizar categorías: eliminar las que ya no están, insertar/actualizar nuevas

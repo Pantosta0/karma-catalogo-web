@@ -1,10 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
 import { useAppState } from "@/lib/app-store";
+import { supabase } from "@/lib/supabase";
 import { uid, DEFAULT_SCHEDULE, type Product, type Category, type DaySchedule, type Promo, type PromoCode } from "@/lib/storage";
 import { uploadImage } from "@/lib/uploads";
 import { LoadingScreen } from "@/components/LoadingScreen";
-import { hashPassword, verifyPassword, isHashed } from "@/lib/crypto";
 import { formatCOP } from "@/lib/cart";
 import { applyPercent } from "@/lib/pricing";
 import { Button } from "@/components/ui/button";
@@ -93,8 +93,8 @@ function AdminPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => {
-              sessionStorage.removeItem("karma_admin");
+            onClick={async () => {
+              await supabase.auth.signOut();
               update((s) => ({ ...s, adminSession: false }));
             }}
           >
@@ -133,26 +133,28 @@ function AdminPage() {
 
 function LoginScreen() {
   const { state, update } = useAppState();
-  const [user, setUser] = useState("");
+  const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
   const [error, setError] = useState("");
+  const [entrando, setEntrando] = useState(false);
 
+  // Supabase Auth reemplaza al usuario/contraseña que vivía en la tabla config,
+  // donde cualquier visitante del menú podía leerlo.
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const userOk = user === state.adminAuth.user;
-    const passOk = await verifyPassword(pass, state.adminAuth.pass);
-    if (userOk && passOk) {
-      sessionStorage.setItem("karma_admin", "1");
-      // Migrar contraseña a hash si aún está en texto plano
-      if (!isHashed(state.adminAuth.pass)) {
-        const hashed = await hashPassword(pass);
-        update((s) => ({ ...s, adminSession: true, adminAuth: { ...s.adminAuth, pass: hashed } }));
-      } else {
-        update((s) => ({ ...s, adminSession: true }));
-      }
-    } else {
-      setError("Usuario o contraseña incorrectos");
+    if (entrando) return;
+    setEntrando(true);
+    setError("");
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password: pass,
+    });
+    if (authError) {
+      setError("Correo o contraseña incorrectos");
+      setEntrando(false);
+      return;
     }
+    update((s) => ({ ...s, adminSession: true }));
   };
 
   const logoUrl = state.config.logoSquare;
@@ -171,16 +173,34 @@ function LoginScreen() {
         </div>
         <form onSubmit={submit} className="space-y-3">
           <div>
-            <Label htmlFor="u">Usuario</Label>
-            <Input id="u" value={user} onChange={(e) => setUser(e.target.value)} autoFocus />
+            <Label htmlFor="u">Correo</Label>
+            <Input
+              id="u"
+              type="email"
+              autoComplete="username"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoFocus
+            />
           </div>
           <div>
             <Label htmlFor="p">Contraseña</Label>
-            <Input id="p" type="password" value={pass} onChange={(e) => setPass(e.target.value)} />
+            <Input
+              id="p"
+              type="password"
+              autoComplete="current-password"
+              value={pass}
+              onChange={(e) => setPass(e.target.value)}
+            />
           </div>
           {error && <p className="text-sm text-brand-bright">{error}</p>}
-          <Button type="submit" className="w-full bg-gradient-brand text-brand-foreground" size="lg">
-            Entrar
+          <Button
+            type="submit"
+            disabled={entrando}
+            className="w-full bg-gradient-brand text-brand-foreground"
+            size="lg"
+          >
+            {entrando ? "Entrando…" : "Entrar"}
           </Button>
           <Link
             to="/"
@@ -692,8 +712,9 @@ function BusinessTab() {
 
   const guardar = async () => {
     setPassError("");
-    let newHashedPass: string | null = null;
 
+    // El cambio de contraseña ya no toca la tabla config: lo hace Supabase Auth
+    // sobre el usuario con sesión activa.
     if (newPass) {
       if (newPass.length < 8) {
         setPassError("La contraseña debe tener al menos 8 caracteres.");
@@ -703,7 +724,12 @@ function BusinessTab() {
         setPassError("Las contraseñas no coinciden.");
         return;
       }
-      newHashedPass = await hashPassword(newPass);
+      const { error } = await supabase.auth.updateUser({ password: newPass });
+      if (error) {
+        setPassError(`No se pudo cambiar la contraseña: ${error.message}`);
+        return;
+      }
+      toast.success("Contraseña actualizada");
     }
 
     update((s) => ({
@@ -718,7 +744,6 @@ function BusinessTab() {
         deliveryFee: Math.max(0, parseInt(deliveryFee, 10) || 0),
         schedule,
       },
-      ...(newHashedPass ? { adminAuth: { ...s.adminAuth, pass: newHashedPass } } : {}),
     }));
     setSaved(true);
     setNewPass("");
