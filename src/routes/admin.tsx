@@ -1,10 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
 import { useAppState } from "@/lib/app-store";
+import { supabase } from "@/lib/supabase";
 import { uid, DEFAULT_SCHEDULE, type Product, type Category, type DaySchedule, type Promo, type PromoCode } from "@/lib/storage";
-import { compressImage } from "@/lib/image";
+import { uploadImage } from "@/lib/uploads";
 import { LoadingScreen } from "@/components/LoadingScreen";
-import { hashPassword, verifyPassword, isHashed } from "@/lib/crypto";
 import { formatCOP } from "@/lib/cart";
 import { applyPercent } from "@/lib/pricing";
 import { Button } from "@/components/ui/button";
@@ -44,12 +44,6 @@ function rejectIfTooLarge(f: File): boolean {
   return true;
 }
 
-function toastImageFailed() {
-  toast.error("No pudimos procesar la imagen", {
-    description: "Puede estar dañada o en un formato que el navegador no abre. Prueba con un JPG o PNG.",
-  });
-}
-
 export const Route = createFileRoute("/admin")({
   head: () => ({
     meta: [
@@ -82,7 +76,7 @@ function AdminPage() {
             <ArrowLeft className="h-5 w-5" />
           </Link>
           {(state.config.logoRect || state.config.logoSquare) && (
-            <span className="flex h-9 min-w-16 items-center shrink-0">
+            <span className="flex h-9 min-w-9 items-center shrink-0">
               <img
                 src={state.config.logoRect || state.config.logoSquare}
                 alt=""
@@ -99,8 +93,8 @@ function AdminPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => {
-              sessionStorage.removeItem("karma_admin");
+            onClick={async () => {
+              await supabase.auth.signOut();
               update((s) => ({ ...s, adminSession: false }));
             }}
           >
@@ -139,26 +133,28 @@ function AdminPage() {
 
 function LoginScreen() {
   const { state, update } = useAppState();
-  const [user, setUser] = useState("");
+  const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
   const [error, setError] = useState("");
+  const [entrando, setEntrando] = useState(false);
 
+  // Supabase Auth reemplaza al usuario/contraseña que vivía en la tabla config,
+  // donde cualquier visitante del menú podía leerlo.
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const userOk = user === state.adminAuth.user;
-    const passOk = await verifyPassword(pass, state.adminAuth.pass);
-    if (userOk && passOk) {
-      sessionStorage.setItem("karma_admin", "1");
-      // Migrar contraseña a hash si aún está en texto plano
-      if (!isHashed(state.adminAuth.pass)) {
-        const hashed = await hashPassword(pass);
-        update((s) => ({ ...s, adminSession: true, adminAuth: { ...s.adminAuth, pass: hashed } }));
-      } else {
-        update((s) => ({ ...s, adminSession: true }));
-      }
-    } else {
-      setError("Usuario o contraseña incorrectos");
+    if (entrando) return;
+    setEntrando(true);
+    setError("");
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password: pass,
+    });
+    if (authError) {
+      setError("Correo o contraseña incorrectos");
+      setEntrando(false);
+      return;
     }
+    update((s) => ({ ...s, adminSession: true }));
   };
 
   const logoUrl = state.config.logoSquare;
@@ -177,16 +173,34 @@ function LoginScreen() {
         </div>
         <form onSubmit={submit} className="space-y-3">
           <div>
-            <Label htmlFor="u">Usuario</Label>
-            <Input id="u" value={user} onChange={(e) => setUser(e.target.value)} autoFocus />
+            <Label htmlFor="u">Correo</Label>
+            <Input
+              id="u"
+              type="email"
+              autoComplete="username"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoFocus
+            />
           </div>
           <div>
             <Label htmlFor="p">Contraseña</Label>
-            <Input id="p" type="password" value={pass} onChange={(e) => setPass(e.target.value)} />
+            <Input
+              id="p"
+              type="password"
+              autoComplete="current-password"
+              value={pass}
+              onChange={(e) => setPass(e.target.value)}
+            />
           </div>
           {error && <p className="text-sm text-brand-bright">{error}</p>}
-          <Button type="submit" className="w-full bg-gradient-brand text-brand-foreground" size="lg">
-            Entrar
+          <Button
+            type="submit"
+            disabled={entrando}
+            className="w-full bg-gradient-brand text-brand-foreground"
+            size="lg"
+          >
+            {entrando ? "Entrando…" : "Entrar"}
           </Button>
           <Link
             to="/"
@@ -361,10 +375,21 @@ function ProductFormDialog({
   const toggleCat = (id: string) =>
     setCategorias((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
 
-  const handleFile = (f: File) => {
-    // Límite generoso — la compresión reduce el tamaño real antes de guardar
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
+
+  const handleFile = async (f: File) => {
+    // Límite generoso — la compresión reduce el tamaño real antes de subir
     if (rejectIfTooLarge(f)) return;
-    compressImage(f, 900, "jpeg", 0.82).then(setFoto).catch(toastImageFailed);
+    setSubiendoFoto(true);
+    try {
+      setFoto(await uploadImage(f, { folder: "productos", maxDimension: 900, quality: 0.82, previous: foto }));
+    } catch (err) {
+      toast.error("No se pudo subir la foto", {
+        description: err instanceof Error ? err.message : "Intenta de nuevo.",
+      });
+    } finally {
+      setSubiendoFoto(false);
+    }
   };
 
   const submit = () => {
@@ -434,8 +459,14 @@ function ProductFormDialog({
                 )}
               </div>
               <div className="flex flex-col gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
-                  {foto ? "Cambiar imagen" : "Subir imagen"}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={subiendoFoto}
+                  onClick={() => fileRef.current?.click()}
+                >
+                  {subiendoFoto ? "Subiendo…" : foto ? "Cambiar imagen" : "Subir imagen"}
                 </Button>
                 {foto && (
                   <Button type="button" variant="ghost" size="sm" onClick={() => setFoto("")}>
@@ -655,22 +686,35 @@ function BusinessTab() {
   const fileSquareRef = useRef<HTMLInputElement>(null);
   const fileRectRef = useRef<HTMLInputElement>(null);
 
-  const handleLogo = (f: File, type: "square" | "rect") => {
+  const [subiendoLogo, setSubiendoLogo] = useState<"square" | "rect" | null>(null);
+
+  const handleLogo = async (f: File, type: "square" | "rect") => {
     if (rejectIfTooLarge(f)) return;
     // Logos: PNG para mantener transparencia; cuadrado max 400px, rect max 800px
-    const maxPx = type === "square" ? 400 : 800;
-    compressImage(f, maxPx, "png")
-      .then((url) => {
-        if (type === "square") setLogoSquare(url);
-        else setLogoRect(url);
-      })
-      .catch(toastImageFailed);
+    setSubiendoLogo(type);
+    try {
+      const url = await uploadImage(f, {
+        folder: "logos",
+        maxDimension: type === "square" ? 400 : 800,
+        format: "png",
+        previous: type === "square" ? logoSquare : logoRect,
+      });
+      if (type === "square") setLogoSquare(url);
+      else setLogoRect(url);
+    } catch (err) {
+      toast.error("No se pudo subir el logo", {
+        description: err instanceof Error ? err.message : "Intenta de nuevo.",
+      });
+    } finally {
+      setSubiendoLogo(null);
+    }
   };
 
   const guardar = async () => {
     setPassError("");
-    let newHashedPass: string | null = null;
 
+    // El cambio de contraseña ya no toca la tabla config: lo hace Supabase Auth
+    // sobre el usuario con sesión activa.
     if (newPass) {
       if (newPass.length < 8) {
         setPassError("La contraseña debe tener al menos 8 caracteres.");
@@ -680,7 +724,12 @@ function BusinessTab() {
         setPassError("Las contraseñas no coinciden.");
         return;
       }
-      newHashedPass = await hashPassword(newPass);
+      const { error } = await supabase.auth.updateUser({ password: newPass });
+      if (error) {
+        setPassError(`No se pudo cambiar la contraseña: ${error.message}`);
+        return;
+      }
+      toast.success("Contraseña actualizada");
     }
 
     update((s) => ({
@@ -695,7 +744,6 @@ function BusinessTab() {
         deliveryFee: Math.max(0, parseInt(deliveryFee, 10) || 0),
         schedule,
       },
-      ...(newHashedPass ? { adminAuth: { ...s.adminAuth, pass: newHashedPass } } : {}),
     }));
     setSaved(true);
     setNewPass("");
@@ -718,8 +766,14 @@ function BusinessTab() {
                 : <ImageOff className="h-6 w-6 text-muted-foreground" />}
             </div>
             <div className="flex flex-col gap-1.5">
-              <Button type="button" variant="outline" size="sm" onClick={() => fileSquareRef.current?.click()}>
-                Subir
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={subiendoLogo === "square"}
+                onClick={() => fileSquareRef.current?.click()}
+              >
+                {subiendoLogo === "square" ? "Subiendo…" : "Subir"}
               </Button>
               {logoSquare && (
                 <Button type="button" variant="ghost" size="sm" onClick={() => setLogoSquare("")}>
@@ -740,8 +794,14 @@ function BusinessTab() {
                 : <ImageOff className="h-6 w-6 text-muted-foreground" />}
             </div>
             <div className="flex flex-col gap-1.5">
-              <Button type="button" variant="outline" size="sm" onClick={() => fileRectRef.current?.click()}>
-                Subir
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={subiendoLogo === "rect"}
+                onClick={() => fileRectRef.current?.click()}
+              >
+                {subiendoLogo === "rect" ? "Subiendo…" : "Subir"}
               </Button>
               {logoRect && (
                 <Button type="button" variant="ghost" size="sm" onClick={() => setLogoRect("")}>
@@ -1111,6 +1171,7 @@ function PromoFormDialog({
   const [desde, setDesde] = useState(promo?.desde ?? "");
   const [hasta, setHasta] = useState(promo?.hasta ?? "");
   const [activo, setActivo] = useState(promo?.activo ?? true);
+  const [subiendoPromo, setSubiendoPromo] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const reset = (p: Promo | null) => {
@@ -1159,8 +1220,14 @@ function PromoFormDialog({
                   : <ImageOff className="h-6 w-6 text-muted-foreground" />}
               </div>
               <div className="flex flex-col gap-1.5">
-                <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
-                  {imagen ? "Cambiar" : "Subir imagen"}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={subiendoPromo}
+                  onClick={() => fileRef.current?.click()}
+                >
+                  {subiendoPromo ? "Subiendo…" : imagen ? "Cambiar" : "Subir imagen"}
                 </Button>
                 {imagen && (
                   <Button type="button" variant="ghost" size="sm" onClick={() => setImagen("")}>
@@ -1175,9 +1242,15 @@ function PromoFormDialog({
                   onChange={(e) => {
                     const f = e.target.files?.[0];
                     if (!f || rejectIfTooLarge(f)) return;
-                    compressImage(f, 800, "jpeg", 0.85)
+                    setSubiendoPromo(true);
+                    uploadImage(f, { folder: "promos", maxDimension: 800, quality: 0.85, previous: imagen })
                       .then(setImagen)
-                      .catch(toastImageFailed);
+                      .catch((err) =>
+                        toast.error("No se pudo subir la imagen", {
+                          description: err instanceof Error ? err.message : "Intenta de nuevo.",
+                        }),
+                      )
+                      .finally(() => setSubiendoPromo(false));
                   }}
                 />
               </div>

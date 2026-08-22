@@ -1,4 +1,5 @@
-import type { Product, PromoCode } from "./storage";
+import type { Product } from "./storage";
+import { supabase } from "./supabase";
 
 /**
  * Reglas de precio, en un solo sitio.
@@ -37,8 +38,20 @@ export function applyPercent(precio: number, pct: number): number {
   return Math.round(precio * (1 - clamped / 100));
 }
 
+/**
+ * Lo que el carrito necesita de un código. Deliberadamente menos que la fila
+ * completa: usos_actuales, usos_maximos y las fechas no salen nunca del
+ * servidor.
+ */
+export type AppliedCode = {
+  id: string;
+  code: string;
+  descuento_tipo: "porcentaje" | "fijo";
+  descuento_valor: number;
+};
+
 /** Descuento en pesos que aporta un código sobre una base dada. */
-export function calcCodeDiscount(code: PromoCode, base: number): number {
+export function calcCodeDiscount(code: AppliedCode, base: number): number {
   if (code.descuento_tipo === "porcentaje") {
     return Math.round((base * code.descuento_valor) / 100);
   }
@@ -46,18 +59,27 @@ export function calcCodeDiscount(code: PromoCode, base: number): number {
   return Math.min(code.descuento_valor, base);
 }
 
-/** Valida un código escrito por el cliente contra la lista vigente. */
-export function validateCode(
+/**
+ * Valida un código contra el servidor.
+ *
+ * Antes se comparaba contra `state.codes`, lo que obligaba a mandar la lista
+ * completa de códigos al navegador de cualquier visitante. Ahora sólo viaja el
+ * código escrito y vuelve el veredicto, así que `codigos` no necesita lectura
+ * pública. La validación de fechas ocurre en hora de Bogotá, no UTC.
+ */
+export async function validateCode(
   input: string,
-  codes: PromoCode[],
-): { ok: true; code: PromoCode } | { ok: false; error: string } {
-  const hoy = today();
-  const found = codes.find((c) => c.code === input.toUpperCase().trim());
-  if (!found) return { ok: false, error: "Código no válido" };
-  if (!found.activo) return { ok: false, error: "Este código no está activo" };
-  if (found.limite_tiempo && (hoy < found.desde || hoy > found.hasta))
-    return { ok: false, error: "Código fuera de su período de validez" };
-  if (found.limite_usos && found.usos_actuales >= found.usos_maximos)
-    return { ok: false, error: "Este código ya agotó sus usos disponibles" };
-  return { ok: true, code: found };
+): Promise<{ ok: true; code: AppliedCode } | { ok: false; error: string }> {
+  const { data, error } = await supabase.rpc("validate_promo_code", {
+    p_code: input.toUpperCase().trim(),
+  });
+
+  if (error) {
+    console.warn("[promo] fallo al validar:", error.message);
+    return { ok: false, error: "No se pudo validar el código. Intenta de nuevo." };
+  }
+  const res = data as { ok: boolean; error?: string; code?: AppliedCode };
+  return res?.ok && res.code
+    ? { ok: true, code: res.code }
+    : { ok: false, error: res?.error ?? "Código no válido" };
 }
