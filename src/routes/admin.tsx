@@ -30,6 +30,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CATEGORY_ICONS, getCategoryIcon } from "@/lib/category-icons";
 import { Plus, Pencil, Trash2, LogOut, Store, Tag, ImageOff, ArrowLeft, X, Megaphone, Clock, Ticket, Hash } from "lucide-react";
 import { toast } from "sonner";
 
@@ -591,8 +593,17 @@ function CategoriesTab() {
     const n = nueva.trim();
     if (!n) return;
     const id = n.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 24) + "-" + uid().slice(0, 4);
-    update((s) => ({ ...s, categorias: [...s.categorias, { id, nombre: n }] }));
+    // Nace con el icono genérico; se cambia desde la fila. Así crear una
+    // categoría sigue siendo escribir y darle a +, sin un paso extra.
+    update((s) => ({ ...s, categorias: [...s.categorias, { id, nombre: n, icono: "" }] }));
     setNueva("");
+  };
+
+  const setIcono = (c: Category, icono: string) => {
+    update((s) => ({
+      ...s,
+      categorias: s.categorias.map((x) => (x.id === c.id ? { ...x, icono } : x)),
+    }));
   };
 
   const remove = (c: Category) => {
@@ -625,21 +636,61 @@ function CategoriesTab() {
           <Plus className="h-4 w-4" />
         </Button>
       </div>
+      <p className="text-xs text-muted-foreground">
+        El icono es lo que ve el cliente en la cuadrícula del menú. Tócalo para
+        cambiarlo.
+      </p>
       <div className="space-y-2">
-        {state.categorias.map((c) => (
-          <div key={c.id} className="flex items-center justify-between bg-card border border-border rounded-lg p-3">
-            <span className="font-medium">{c.nombre}</span>
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={() => remove(c)}
-              className="text-brand-bright"
-              aria-label="Eliminar"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        ))}
+        {state.categorias.map((c) => {
+          const Icon = getCategoryIcon(c.icono);
+          return (
+            <div key={c.id} className="flex items-center gap-3 bg-card border border-border rounded-lg p-3">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    className="focus-ring h-11 w-11 shrink-0 rounded-lg bg-muted border border-border flex items-center justify-center text-brand-bright hover:bg-muted/70 transition-colors"
+                    aria-label={`Cambiar icono de ${c.nombre}`}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-72 p-2">
+                  <div className="grid grid-cols-6 gap-1">
+                    {CATEGORY_ICONS.map((opt) => {
+                      const OptIcon = opt.Icon;
+                      const active = (c.icono || "UtensilsCrossed") === opt.name;
+                      return (
+                        <button
+                          key={opt.name}
+                          onClick={() => setIcono(c, opt.name)}
+                          aria-label={opt.name}
+                          aria-pressed={active}
+                          className={`focus-ring h-10 w-10 rounded-md flex items-center justify-center transition-colors ${
+                            active
+                              ? "bg-primary text-primary-foreground"
+                              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                          }`}
+                        >
+                          <OptIcon className="h-5 w-5" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </PopoverContent>
+              </Popover>
+              <span className="font-medium flex-1 min-w-0 truncate">{c.nombre}</span>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => remove(c)}
+                className="text-brand-bright shrink-0"
+                aria-label="Eliminar"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

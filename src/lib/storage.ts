@@ -3,7 +3,9 @@
 
 import { supabase } from "./supabase";
 
-export type Category = { id: string; nombre: string };
+/** `icono` guarda el nombre de un icono de lucide (ver `category-icons.ts`),
+ *  nunca un SVG ni una URL. Vacío = usar el icono por defecto. */
+export type Category = { id: string; nombre: string; icono: string };
 
 export type Product = {
   id: string;
@@ -84,10 +86,10 @@ export const DEFAULT_SCHEDULE: DaySchedule[] = [
 ];
 
 const DEFAULT_CATEGORIES: Category[] = [
-  { id: "hamburguesas", nombre: "Hamburguesas" },
-  { id: "asados", nombre: "Asados" },
-  { id: "bebidas", nombre: "Bebidas" },
-  { id: "combos", nombre: "Combos" },
+  { id: "hamburguesas", nombre: "Hamburguesas", icono: "Beef" },
+  { id: "asados", nombre: "Asados", icono: "Flame" },
+  { id: "bebidas", nombre: "Bebidas", icono: "CupSoda" },
+  { id: "combos", nombre: "Combos", icono: "Gift" },
 ];
 
 export const DEFAULT_STATE: AppState = {
@@ -186,6 +188,9 @@ function normalizeState(s: AppState): AppState {
       ogImage: s.config.ogImage ?? "",
       schedule: s.config.schedule ?? DEFAULT_SCHEDULE,
     },
+    // Un navegador que guardó el estado antes de la fase 3 trae categorías sin
+    // `icono`; sin este relleno la cuadrícula del menú pinta undefined.
+    categorias: (s.categorias ?? []).map((c) => ({ ...c, icono: c.icono ?? "" })),
     productos: (s.productos ?? []).map((p) => ({
       ...p,
       descuento_pct: p.descuento_pct ?? 0,
@@ -245,10 +250,15 @@ export async function loadStateFromSupabase(): Promise<AppState> {
       schedule: DaySchedule[] | null;
     };
 
-    const categorias: Category[] = (catRes.data ?? []).map((c: { id: string; nombre: string }) => ({
-      id: c.id,
-      nombre: c.nombre,
-    }));
+    const categorias: Category[] = (catRes.data ?? []).map(
+      (c: { id: string; nombre: string; icono?: string }) => ({
+        id: c.id,
+        nombre: c.nombre,
+        // `icono` es opcional en el tipo a propósito: si la fase 3 todavía no
+        // se corrió, la columna no existe y la fila llega sin ella.
+        icono: c.icono ?? "",
+      }),
+    );
 
     const productos: Product[] = (prodRes.data ?? []).map((p: {
       id: string; nombre: string; descripcion: string; precio: number;
@@ -347,7 +357,7 @@ export async function saveStateToSupabase(state: AppState): Promise<void> {
     // Upsert categorías actuales
     if (state.categorias.length > 0) {
       await supabase.from("categorias").upsert(
-        state.categorias.map((c, i) => ({ id: c.id, nombre: c.nombre, orden: i }))
+        state.categorias.map((c, i) => ({ id: c.id, nombre: c.nombre, orden: i, icono: c.icono ?? "" }))
       );
     }
 
