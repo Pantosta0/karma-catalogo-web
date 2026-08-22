@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState, useEffect, useRef, forwardRef } from "react";
 import { useAppState } from "@/lib/app-store";
+import { supabase } from "@/lib/supabase";
 import { useCart, formatCOP } from "@/lib/cart";
 import { getDiscountedPrice, isDiscounted, validateCode, calcCodeDiscount } from "@/lib/pricing";
 import type { Product, DaySchedule, PromoCode } from "@/lib/storage";
@@ -67,7 +68,8 @@ export const Route = createFileRoute("/")({
 });
 
 function CatalogPage() {
-  const { state, loading, update } = useAppState();
+  // El catálogo es sólo lectura: ya no escribe estado global.
+  const { state, loading } = useAppState();
   const cart = useCart(state.productos, !loading);
   const [activeCat, setActiveCat] = useState<string>("todos");
   const [selected, setSelected] = useState<Product | null>(null);
@@ -462,14 +464,20 @@ function CatalogPage() {
         totalFinal={totalFinal}
         whatsapp={state.config.whatsapp}
         onSent={() => {
-          // Incrementar usos del código si fue aplicado
+          // Incrementar usos del código si fue aplicado.
+          //
+          // Vía RPC y no con update(): update() dispara un guardado completo
+          // del estado —config, productos, categorías— desde el catálogo
+          // público, que con RLS activo ya no está permitido. La función
+          // toca una sola columna y el incremento es atómico, así que dos
+          // pedidos simultáneos ya no se pisan el contador.
           if (appliedCode) {
-            update((s) => ({
-              ...s,
-              codes: s.codes.map((c) =>
-                c.id === appliedCode.id ? { ...c, usos_actuales: c.usos_actuales + 1 } : c
-              ),
-            }));
+            const id = appliedCode.id;
+            supabase
+              .rpc("increment_code_usage", { code_id: id })
+              .then(({ error }) => {
+                if (error) console.warn("[promo] no se pudo contar el uso:", error.message);
+              });
             setAppliedCode(null);
           }
           cart.clear();
