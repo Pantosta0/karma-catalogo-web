@@ -197,7 +197,7 @@ function CatalogPage() {
             // width/height afirmarían una relación que puede ser falsa. En su
             // lugar se reserva el hueco: alto fijo y un ancho mínimo, para que
             // la insignia de abierto/cerrado no salte cuando la imagen decodifica.
-            <span className="flex h-12 sm:h-14 min-w-24 items-center shrink-0">
+            <span className="flex h-12 sm:h-14 min-w-12 sm:min-w-14 items-center shrink-0">
               <img
                 src={logoHeaderUrl}
                 alt={state.config.nombre}
@@ -790,7 +790,16 @@ function CartSheet({
                 <Button variant="outline" size="sm" onClick={applyCode} className="shrink-0">Aplicar</Button>
               </div>
             )}
-            {codeError && <p className="text-xs text-brand-bright mt-1">{codeError}</p>}
+            {codeError && (
+              <p role="alert" className="text-xs text-brand-bright mt-1">
+                {codeError}
+              </p>
+            )}
+            <p aria-live="polite" className="sr-only">
+              {appliedCode
+                ? `Código ${appliedCode.code} aplicado. Descuento de ${formatCOP(codeDiscountAmount)}. Nuevo total ${formatCOP(totalFinal)}.`
+                : ""}
+            </p>
           </div>
 
           {/* Desglose */}

@@ -82,7 +82,7 @@ function AdminPage() {
             <ArrowLeft className="h-5 w-5" />
           </Link>
           {(state.config.logoRect || state.config.logoSquare) && (
-            <span className="flex h-9 min-w-16 items-center shrink-0">
+            <span className="flex h-9 min-w-9 items-center shrink-0">
               <img
                 src={state.config.logoRect || state.config.logoSquare}
                 alt=""
