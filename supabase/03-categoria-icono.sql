@@ -34,9 +34,16 @@ alter table categorias
 -- ─── PASO 2 · Sembrar las categorías que ya existen ─────────────────────────
 -- Sin esto toda categoría anterior a la migración sale con el icono genérico.
 -- Sólo toca filas que aún no tienen icono, así que correrlo dos veces no pisa
--- lo que el dueño haya elegido a mano.
+-- lo que el dueño haya elegido a mano — y por eso cambiar un icono desde el
+-- panel es definitivo aunque alguien vuelva a correr este archivo.
+--
+-- Son propuestas, no decisiones: cualquiera se cambia con un toque en
+-- Panel → Categorías. Las que no aparezcan aquí salen con el icono genérico,
+-- que es una señal legítima de "falta elegir este".
 update categorias set icono = 'Beef'      where icono = '' and id like 'hamburguesas%';
 update categorias set icono = 'Flame'     where icono = '' and id like 'asados%';
+update categorias set icono = 'Wheat'     where icono = '' and id like 'desgranados%';
+update categorias set icono = 'Drumstick' where icono = '' and id like 'picadas%';
 update categorias set icono = 'CupSoda'   where icono = '' and id like 'bebidas%';
 update categorias set icono = 'Gift'      where icono = '' and id like 'combos%';
 
