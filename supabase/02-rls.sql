@@ -60,6 +60,69 @@ grant execute on function public.increment_code_usage(text) to anon, authenticat
 -- Rollback: drop function public.increment_code_usage(text);
 
 
+-- ─── PASO 2b · Validación de códigos sin exponer la lista ───────────────────
+-- El carrito validaba el código contra state.codes, así que la lista completa
+-- viajaba al navegador de cualquiera. Con esto `codigos` deja de necesitar
+-- lectura pública: el cliente manda un código y recibe sólo el veredicto.
+--
+-- Devuelve únicamente lo que el carrito necesita para calcular el descuento.
+-- Nunca usos_actuales, usos_maximos ni el resto de la fila.
+--
+-- Nota: usa la fecha de Bogotá, no UTC. El cliente usaba toISOString(), que
+-- entre las 19:00 y medianoche hora local ya reporta el día siguiente y
+-- vencía los códigos cinco horas antes de tiempo.
+create or replace function public.validate_promo_code(p_code text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  c   codigos%rowtype;
+  hoy date := (now() at time zone 'America/Bogota')::date;
+begin
+  select * into c
+  from codigos
+  where upper(code) = upper(btrim(p_code))
+  limit 1;
+
+  if not found then
+    return jsonb_build_object('ok', false, 'error', 'Código no válido');
+  end if;
+
+  if not c.activo then
+    return jsonb_build_object('ok', false, 'error', 'Este código no está activo');
+  end if;
+
+  if c.limite_tiempo then
+    if nullif(c.desde, '') is null or nullif(c.hasta, '') is null
+       or hoy < c.desde::date or hoy > c.hasta::date then
+      return jsonb_build_object('ok', false, 'error', 'Código fuera de su período de validez');
+    end if;
+  end if;
+
+  if c.limite_usos and c.usos_actuales >= c.usos_maximos then
+    return jsonb_build_object('ok', false, 'error', 'Este código ya agotó sus usos disponibles');
+  end if;
+
+  return jsonb_build_object(
+    'ok', true,
+    'code', jsonb_build_object(
+      'id',              c.id,
+      'code',            c.code,
+      'descuento_tipo',  c.descuento_tipo,
+      'descuento_valor', c.descuento_valor
+    )
+  );
+end;
+$$;
+
+revoke all on function public.validate_promo_code(text) from public;
+grant execute on function public.validate_promo_code(text) to anon, authenticated;
+
+-- Rollback: drop function public.validate_promo_code(text);
+
+
 -- ─── PASO 3 · RLS ───────────────────────────────────────────────────────────
 -- Lectura pública en todo (el menú es público). Escritura sólo autenticada.
 --
@@ -101,13 +164,10 @@ drop policy if exists "promos escritura autenticada" on promos;
 create policy "promos escritura autenticada" on promos for all
   to authenticated using (true) with check (true);
 
--- codigos
--- Lectura pública porque el carrito valida el código en el cliente. Eso expone
--- la lista de códigos a quien mire la red — aceptable para descuentos de menú,
--- pero conviene saberlo. La alternativa sería validar por RPC.
+-- codigos — SIN lectura pública. El carrito valida por RPC (paso 2b), así que
+-- nadie anónimo necesita ver la lista. Sólo el panel autenticado la lee.
 alter table codigos enable row level security;
 drop policy if exists "codigos lectura publica" on codigos;
-create policy "codigos lectura publica" on codigos for select using (true);
 drop policy if exists "codigos escritura autenticada" on codigos;
 create policy "codigos escritura autenticada" on codigos for all
   to authenticated using (true) with check (true);

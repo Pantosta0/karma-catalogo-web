@@ -3,8 +3,14 @@ import { useMemo, useState, useEffect, useRef, forwardRef } from "react";
 import { useAppState } from "@/lib/app-store";
 import { supabase } from "@/lib/supabase";
 import { useCart, formatCOP } from "@/lib/cart";
-import { getDiscountedPrice, isDiscounted, validateCode, calcCodeDiscount } from "@/lib/pricing";
-import type { Product, DaySchedule, PromoCode } from "@/lib/storage";
+import {
+  getDiscountedPrice,
+  isDiscounted,
+  validateCode,
+  calcCodeDiscount,
+  type AppliedCode,
+} from "@/lib/pricing";
+import type { Product, DaySchedule } from "@/lib/storage";
 import {
   Dialog,
   DialogContent,
@@ -78,7 +84,7 @@ function CatalogPage() {
   const [promoOpen, setPromoOpen] = useState(false);
   const [activePromo, setActivePromo] = useState<(typeof state.promos)[0] | null>(null);
   const [closedOpen, setClosedOpen] = useState(false);
-  const [appliedCode, setAppliedCode] = useState<PromoCode | null>(null);
+  const [appliedCode, setAppliedCode] = useState<AppliedCode | null>(null);
 
   // El estado abierto/cerrado se reevalúa cada 30s y al volver a la pestaña.
   // Sin esto, quien deja el menú abierto sigue viendo "Abierto" pasada la hora
@@ -254,7 +260,6 @@ function CatalogPage() {
               codeDiscountAmount={codeDiscountAmount}
               deliveryFee={deliveryFee}
               totalFinal={totalFinal}
-              codes={state.codes}
               onApplyCode={setAppliedCode}
               setQty={cart.setQty}
               remove={cart.remove}
@@ -686,17 +691,16 @@ function ProductModal({
 
 function CartSheet({
   items, subtotal, productDiscountTotal, appliedCode, codeDiscountAmount, deliveryFee, totalFinal,
-  codes, onApplyCode, setQty, remove, onCheckout,
+  onApplyCode, setQty, remove, onCheckout,
 }: {
   items: ReturnType<typeof useCart>["items"];
   subtotal: number;
   productDiscountTotal: number;
-  appliedCode: PromoCode | null;
+  appliedCode: AppliedCode | null;
   codeDiscountAmount: number;
   deliveryFee: number;
   totalFinal: number;
-  codes: PromoCode[];
-  onApplyCode: (c: PromoCode | null) => void;
+  onApplyCode: (c: AppliedCode | null) => void;
   setQty: (id: string, q: number) => void;
   remove: (id: string) => void;
   onCheckout: () => void;
@@ -704,11 +708,20 @@ function CartSheet({
   const [codeInput, setCodeInput] = useState("");
   const [codeError, setCodeError] = useState("");
 
-  const applyCode = () => {
-    if (!codeInput.trim()) return;
-    const result = validateCode(codeInput, codes);
-    if (result.ok) { onApplyCode(result.code); setCodeError(""); setCodeInput(""); }
-    else setCodeError(result.error);
+  const [validando, setValidando] = useState(false);
+
+  const applyCode = async () => {
+    if (!codeInput.trim() || validando) return;
+    setValidando(true);
+    const result = await validateCode(codeInput);
+    if (result.ok) {
+      onApplyCode(result.code);
+      setCodeError("");
+      setCodeInput("");
+    } else {
+      setCodeError(result.error);
+    }
+    setValidando(false);
   };
 
   return (
@@ -795,7 +808,15 @@ function CartSheet({
                   onChange={(e) => { setCodeInput(e.target.value.toUpperCase()); setCodeError(""); }}
                   onKeyDown={(e) => e.key === "Enter" && applyCode()}
                   className="font-display tracking-widest uppercase text-sm" />
-                <Button variant="outline" size="sm" onClick={applyCode} className="shrink-0">Aplicar</Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={applyCode}
+                  disabled={validando}
+                  className="shrink-0"
+                >
+                  {validando ? "…" : "Aplicar"}
+                </Button>
               </div>
             )}
             {codeError && (
@@ -854,7 +875,7 @@ function CheckoutModal({
   items: ReturnType<typeof useCart>["items"];
   subtotal: number;
   productDiscountTotal: number;
-  appliedCode: PromoCode | null;
+  appliedCode: AppliedCode | null;
   codeDiscountAmount: number;
   deliveryFee: number;
   totalFinal: number;
