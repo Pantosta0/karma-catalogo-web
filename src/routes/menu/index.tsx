@@ -34,9 +34,12 @@ function CategoryGrid() {
 
   return (
     <main className="max-w-5xl mx-auto px-4">
+      {/* El lema vive en la portada y sólo ahí. Repetirlo aquí le quita el
+          golpe, y quien entra directo a /menu desde Instagram viene a pedir,
+          no a que le recuerden de qué va la marca. */}
       <section className="pt-6 pb-4">
         <h1 className="text-2xl sm:text-3xl font-display font-bold text-brand-bright text-balance">
-          Sabes lo que hiciste. Te lo mereces hoy.
+          Nuestro menú
         </h1>
         <p className="text-sm sm:text-base text-muted-foreground mt-1">
           Elige una categoría y arma tu pedido.
@@ -71,7 +74,9 @@ function CategoryGrid() {
                     aria-hidden="true"
                   />
                   <div className="text-center">
-                    <h3 className="font-display font-bold leading-tight text-balance">{c.nombre}</h3>
+                    <h3 className="font-display font-bold leading-tight text-balance">
+                      {c.nombre}
+                    </h3>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       {n} {n === 1 ? "plato" : "platos"}
                     </p>

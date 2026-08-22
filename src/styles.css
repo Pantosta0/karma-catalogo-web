@@ -173,9 +173,27 @@
       width 220ms cubic-bezier(0.16, 1, 0.3, 1);
   }
 
+  /*
+    El mismo relleno del loader, una sola vez, en la portada.
+
+    Clase aparte de `.karma-loader-fill` a propósito: aquélla late en bucle bajo
+    `prefers-reduced-motion` porque ahí el latido significa "estoy trabajando".
+    Aquí no hay nada cargando — es una entrada — así que el sustituto correcto
+    no es un pulso infinito sino la marca ya llena. Reusar la clase del loader
+    habría dejado el logo palpitando para siempre en la portada.
+  */
+  .karma-hero-fill {
+    animation: karma-fill 1.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .slider-indicator {
       transition: none;
+    }
+
+    .karma-hero-fill {
+      animation: none;
+      clip-path: none;
     }
 
     /* El relleno del logo pasa de recorrido espacial a pulso de opacidad:
