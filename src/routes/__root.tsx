@@ -20,12 +20,14 @@ function NotFoundComponent() {
         <p className="mt-2 text-sm text-muted-foreground">
           La página que buscas no existe o fue movida.
         </p>
+        {/* Al menú y no a "/": aquí se llega casi siempre por una categoría
+            que ya no existe, y lo que esa persona venía a hacer era pedir. */}
         <div className="mt-6">
           <Link
-            to="/"
+            to="/menu"
             className="focus-ring rounded inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
           >
-            Volver al catálogo
+            Volver al menú
           </Link>
         </div>
       </div>
@@ -103,12 +105,13 @@ function RootComponent() {
     link.type = logo.startsWith("data:image/png") ? "image/png" : "image/jpeg";
   }, [state.config.logoSquare]);
 
-  // ── Título del catálogo desde la config ─────────────────────────────────
-  // Solo en "/": /admin y la política definen el suyo con head(). Depende de
-  // pathname para volver a aplicarse al regresar al catálogo desde otra ruta.
+  // ── Título desde la config ──────────────────────────────────────────────
+  // /admin y la política definen el suyo con head(). Depende de pathname para
+  // volver a aplicarse al regresar desde otra ruta.
   useEffect(() => {
-    if (pathname !== "/") return;
-    document.title = `${state.config.nombre || "Karma"} — Menú`;
+    const nombre = state.config.nombre || "Karma";
+    if (pathname === "/") document.title = nombre;
+    else if (pathname.startsWith("/menu")) document.title = `${nombre} — Menú`;
   }, [state.config.nombre, pathname]);
 
   // ── Meta description desde la config ────────────────────────────────────

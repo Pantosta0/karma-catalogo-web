@@ -1,9 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Las categorías (/menu/<id>) no se listan: sus ids los genera el panel con un
+  sufijo aleatorio y cambian cada vez que alguien recrea una categoría, así que
+  una lista fija aquí envejece mal. /menu/todos sí es estable y desde ahí se
+  alcanza cada plato.
+-->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://karmaclub.food/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://karmaclub.food/menu</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://karmaclub.food/menu/todos</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
   </url>
   <url>
     <loc>https://karmaclub.food/politica-de-privacidad-y-uso-de-datos</loc>
