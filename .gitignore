@@ -36,3 +36,4 @@ dist-ssr
 
 # Impeccable live: estado de sesión, no fuente
 .impeccable/live/
+supabase/.temp/
