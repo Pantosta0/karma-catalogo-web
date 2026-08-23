@@ -233,9 +233,83 @@ function Hero() {
   );
 }
 
+/**
+ * El veredicto, frase por frase, para el barrido de lectura.
+ *
+ * Partido a mano y no con un `split(/\./)`: el texto tiene dos puntos, rayas y
+ * un «11:00» de vecino, y una expresión regular que hoy acierta se rompe con la
+ * próxima edición. Además así se decide dónde respira la frase, que es la mitad
+ * del efecto — «Aquí no preguntamos.» aguanta sola, y la enumeración larga que
+ * la sigue pasa de corrido.
+ */
+const VEREDICTO: string[][] = [
+  ["Karma no es un castigo.", "Es una cuenta que se salda."],
+  [
+    "Tuviste una semana larga.",
+    "Cerraste el mes.",
+    "Sobreviviste el lunes.",
+    "Lo que sea que hiciste —y sabes lo que hiciste— hoy vuelve en forma de hamburguesa.",
+  ],
+  [
+    "Aquí no preguntamos.",
+    "Parrilla, candela y una carta corta: hamburguesas que no piden permiso, asados como en casa, desgranados que llenan de verdad y picadas para cuando son varios.",
+  ],
+  [
+    "Y pides directo.",
+    "Sin apps de por medio, sin nadie cobrando comisión encima de tu comida.",
+    "Escribes por WhatsApp y te responde la cocina.",
+  ],
+];
+
+/**
+ * El ritmo del barrido.
+ *
+ * A velocidad de lectura real —unas 200 palabras por minuto, 300 ms por
+ * palabra— este texto tardaría veintisiete segundos en encenderse entero, y
+ * nadie espera eso. Así que el barrido va por delante del lector, a unas cuatro
+ * veces esa velocidad: cuando terminas la primera frase la tercera ya está
+ * encendida. El punto sí se respeta, que es lo que hace que se sienta leído y
+ * no cronometrado.
+ */
+const WORD_MS = 70; // avance por palabra
+const PERIOD_MS = 190; // el respiro en el punto
+const LEAD_MS = 260; // deja llegar la sección antes de arrancar
+
+/** Retraso acumulado de cada frase, calculado una vez: el texto es constante. */
+const VEREDICTO_TIMED = (() => {
+  let acc = LEAD_MS;
+  return VEREDICTO.map((parrafo) =>
+    parrafo.map((frase) => {
+      const delay = acc;
+      acc += frase.trim().split(/\s+/).length * WORD_MS + PERIOD_MS;
+      return { frase, delay };
+    }),
+  );
+})();
+
+/**
+ * El texto no aparece: se enciende.
+ *
+ * Es la diferencia entre esto y un reveal, y es deliberada. En un karaoke la
+ * letra entera está a la vista y lo que se mueve es el resaltado — nunca te
+ * esconde la línea siguiente. Aplicado aquí eso significa que quien lee rápido
+ * puede adelantarse, que un lector de pantalla encuentra el párrafo completo en
+ * el DOM desde el primer momento, y que si alguien llega a mitad del barrido no
+ * se encuentra media página en blanco.
+ *
+ * El barrido son transiciones CSS con `transition-delay` escalonado y no
+ * temporizadores en JS: se disparan solas cuando `encendido` cambia, corren en
+ * el compositor y no cuestan un re-render por frase.
+ */
 function Veredicto() {
+  const reduce = useReducedMotion();
+  const ref = useRef<HTMLElement>(null);
+  // 0.4 y no 0.25: el barrido debe arrancar cuando el párrafo se está mirando,
+  // no cuando asoma su primera línea por el borde de la pantalla.
+  const encendido = useInView(ref, { once: true, amount: 0.4 });
+
   return (
-    <Seccion className="max-w-5xl mx-auto px-4 py-20 sm:py-28">
+    <section ref={ref} className="max-w-5xl mx-auto px-4 py-20 sm:py-28">
       {/* El tratamiento «Stamp» de DESIGN.md: Anton diminuto con tracking
           extremo. Está reservado para momentos de ceremonia y aparece una sola
           vez en la página — el loader, que es su otro uso, no vive en esta ruta. */}
@@ -245,22 +319,27 @@ function Veredicto() {
       {/* 34rem: la medida de lectura del sistema. El contenedor de 64rem es casi
           un tercio demasiado ancho para prosa seguida. */}
       <div className="mt-6 max-w-[34rem] space-y-5 text-base leading-[1.75] tracking-[0.006em]">
-        <p>Karma no es un castigo. Es una cuenta que se salda.</p>
-        <p>
-          Tuviste una semana larga. Cerraste el mes. Sobreviviste el lunes. Lo que sea que hiciste
-          —y sabes lo que hiciste— hoy vuelve en forma de hamburguesa.
-        </p>
-        <p>
-          Aquí no preguntamos. Parrilla, candela y una carta corta: hamburguesas que no piden
-          permiso, asados como en casa, desgranados que llenan de verdad y picadas para cuando son
-          varios.
-        </p>
-        <p>
-          Y pides directo. Sin apps de por medio, sin nadie cobrando comisión encima de tu comida.
-          Escribes por WhatsApp y te responde la cocina.
-        </p>
+        {VEREDICTO_TIMED.map((parrafo, i) => (
+          <p key={i}>
+            {parrafo.map(({ frase, delay }) => (
+              <span
+                key={frase}
+                // Apagado a 0.4 y no a 0: a cero esto sería un reveal con otro
+                // nombre. A 0.4 la frase que todavía no llega se lee igual, sólo
+                // que en segundo plano, como la letra que aún no cantas.
+                className="transition-opacity duration-[450ms] ease-out"
+                style={{
+                  opacity: reduce || encendido ? 1 : 0.4,
+                  transitionDelay: reduce ? "0ms" : `${delay}ms`,
+                }}
+              >
+                {frase}{" "}
+              </span>
+            ))}
+          </p>
+        ))}
       </div>
-    </Seccion>
+    </section>
   );
 }
 
