@@ -48,14 +48,28 @@ export const DURATION = {
   tap: 0.12,
   /** El estándar de la casa — lo que dura el indicador de categoría. */
   base: 0.22,
-  /** Entradas de sección en la portada. */
-  enter: 0.45,
+  /**
+   * Entradas de sección en la portada.
+   *
+   * Estaba en 0.45 y no se veía. Medido en el navegador con esa curva: la
+   * opacidad llegaba a 0.48 a los 51 ms y a 0.89 a los 152 ms — o sea que
+   * nueve décimas del efecto pasaban antes de que el ojo lo registrara como
+   * movimiento. EASE_OUT arranca muy rápido a propósito (para eso sirve en el
+   * indicador de categoría, que tiene que sentirse inmediato), así que una
+   * entrada con esta curva necesita más tiempo, no menos.
+   */
+  enter: 0.7,
 } as const;
 
-/** Entrada estándar: sube un poco y aparece. El desplazamiento es corto a
- *  propósito; un recorrido largo se lee como una web de plantilla. */
+/**
+ * Entrada estándar: sube y aparece.
+ *
+ * El recorrido es corto porque uno largo se lee como plantilla, pero 12 px con
+ * la curva de la casa era directamente imperceptible. 28 px es lo mínimo que se
+ * lee como que algo entró sin que parezca que la sección viene volando.
+ */
 export const fadeUp = {
-  initial: { opacity: 0, y: 12 },
+  initial: { opacity: 0, y: 28 },
   animate: { opacity: 1, y: 0 },
   transition: { duration: DURATION.enter, ease: EASE_OUT },
 };

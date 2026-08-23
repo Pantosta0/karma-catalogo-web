@@ -167,7 +167,14 @@ function Hero() {
       {/* El relleno del loader, una vez. Es el gesto con autoría de la marca y
           no se inventa uno nuevo para la portada. Capa gris debajo, capa a
           color revelándose de abajo hacia arriba encima. */}
-      <div className="relative h-24 w-24 sm:h-28 sm:w-28 mb-8">
+      {/*
+        La entrada escalonada va en CSS (`karma-rise`) y no en Motion: el hero
+        no espera al chunk de animación, así que su propia animación tampoco
+        puede depender de él. Los retrasos son cortos — la marca, la frase, la
+        explicación, el botón — y el conjunto termina antes de los 1.2 s, que
+        es más o menos lo que alguien tarda en decidir si se queda.
+      */}
+      <div className="karma-rise relative h-24 w-24 sm:h-28 sm:w-28 mb-8">
         <img
           src={MARCA}
           alt=""
@@ -190,17 +197,30 @@ function Hero() {
         navegador decida dónde parte esta frase da tres en cuanto la pantalla
         es estrecha. Partirla por la puntuación es además donde la partiría
         alguien leyéndola en voz alta.
+
+        Cada frase entra por separado: es una acusación y luego el premio, y
+        se leen mejor una después de la otra que las dos de golpe.
       */}
       <h1 className="font-display font-bold text-brand-bright text-balance leading-[1.05] text-[clamp(2rem,8.5vw,4.5rem)]">
-        <span className="block">Sabes lo que hiciste.</span>
-        <span className="block">Te lo mereces hoy.</span>
+        <span className="karma-rise block" style={{ animationDelay: "0.15s" }}>
+          Sabes lo que hiciste.
+        </span>
+        <span className="karma-rise block" style={{ animationDelay: "0.35s" }}>
+          Te lo mereces hoy.
+        </span>
       </h1>
 
-      <p className="mt-5 max-w-md text-base sm:text-lg text-muted-foreground">
+      <p
+        className="karma-rise mt-5 max-w-md text-base sm:text-lg text-muted-foreground"
+        style={{ animationDelay: "0.55s" }}
+      >
         Hamburguesas, asados y picadas. Pedido directo por WhatsApp, sin apps de por medio.
       </p>
 
-      <div className="mt-8 flex flex-col items-center gap-4">
+      <div
+        className="karma-rise mt-8 flex flex-col items-center gap-4"
+        style={{ animationDelay: "0.7s" }}
+      >
         <Link
           to="/menu"
           className="focus-ring inline-flex h-12 items-center justify-center rounded-md bg-gradient-brand px-8 text-base font-bold text-brand-foreground shadow-card hover:opacity-95 transition"

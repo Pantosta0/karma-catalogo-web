@@ -4,10 +4,13 @@
 
 /* Loading: logo se llena de color de abajo hacia arriba */
 @keyframes karma-fill {
-  0%   { clip-path: inset(100% 0 0 0); }
-  100% { clip-path: inset(0% 0 0 0); }
+  0% {
+    clip-path: inset(100% 0 0 0);
+  }
+  100% {
+    clip-path: inset(0% 0 0 0);
+  }
 }
-
 
 @custom-variant dark (&:is(.dark *));
 
@@ -64,25 +67,25 @@
   --radius: 0.5rem;
 
   /* Brand — Karma */
-  --brand: oklch(0.624 0.254 25.9);         /* #FC0025 rojo Karma */
+  --brand: oklch(0.624 0.254 25.9); /* #FC0025 rojo Karma */
   --brand-foreground: oklch(1 0 0);
-  --brand-bright: oklch(0.64 0.244 25.9);   /* #FE2531 rojo para texto */
-  --gold: oklch(0.909 0.088 105.2);         /* #E9E5A0 crema */
-  --cream: oklch(0.909 0.088 105.2);        /* #E9E5A0 crema */
+  --brand-bright: oklch(0.64 0.244 25.9); /* #FE2531 rojo para texto */
+  --gold: oklch(0.909 0.088 105.2); /* #E9E5A0 crema */
+  --cream: oklch(0.909 0.088 105.2); /* #E9E5A0 crema */
 
-  --background: oklch(0.159 0 0);           /* #0D0D0D negro */
-  --foreground: oklch(1 0 0);               /* blanco */
+  --background: oklch(0.159 0 0); /* #0D0D0D negro */
+  --foreground: oklch(1 0 0); /* blanco */
 
-  --card: oklch(0.218 0 0);                 /* #1A1A1A */
+  --card: oklch(0.218 0 0); /* #1A1A1A */
   --card-foreground: oklch(1 0 0);
 
   --popover: oklch(0.218 0 0);
   --popover-foreground: oklch(1 0 0);
 
-  --primary: oklch(0.594 0.242 25.9);       /* #EC0022 relleno */
+  --primary: oklch(0.594 0.242 25.9); /* #EC0022 relleno */
   --primary-foreground: oklch(1 0 0);
 
-  --secondary: oklch(0.909 0.088 105.2);    /* #E9E5A0 crema */
+  --secondary: oklch(0.909 0.088 105.2); /* #E9E5A0 crema */
   --secondary-foreground: oklch(0.159 0 0);
 
   --muted: oklch(0.26 0 0);
@@ -102,12 +105,21 @@
 
   --shadow-card: 0 4px 20px -2px color-mix(in oklab, var(--brand) 30%, transparent);
   --shadow-soft: 0 2px 10px -2px color-mix(in oklab, var(--brand) 20%, transparent);
-  --gradient-brand: linear-gradient(135deg, var(--brand), color-mix(in oklab, var(--brand) 75%, oklch(0 0 0)));
+  --gradient-brand: linear-gradient(
+    135deg,
+    var(--brand),
+    color-mix(in oklab, var(--brand) 75%, oklch(0 0 0))
+  );
 }
 
 @layer base {
-  * { border-color: var(--color-border); }
-  html, body { font-family: var(--font-sans); }
+  * {
+    border-color: var(--color-border);
+  }
+  html,
+  body {
+    font-family: var(--font-sans);
+  }
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
@@ -126,10 +138,25 @@
     z-index: -1;
     pointer-events: none;
     background-image:
-      radial-gradient(at 0% 0%, color-mix(in oklab, var(--brand) 12%, transparent) 0px, transparent 55%),
-      radial-gradient(at 100% 100%, color-mix(in oklab, var(--brand) 8%, transparent) 0px, transparent 55%);
+      radial-gradient(
+        at 0% 0%,
+        color-mix(in oklab, var(--brand) 12%, transparent) 0px,
+        transparent 55%
+      ),
+      radial-gradient(
+        at 100% 100%,
+        color-mix(in oklab, var(--brand) 8%, transparent) 0px,
+        transparent 55%
+      );
   }
-  h1, h2, h3, .font-display { font-family: var(--font-display); letter-spacing: 0.02em; text-transform: uppercase; }
+  h1,
+  h2,
+  h3,
+  .font-display {
+    font-family: var(--font-display);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
 
   /*
     Superficies que pinta el navegador. Vienen con los valores de fábrica de
@@ -144,14 +171,21 @@
     scrollbar-color: color-mix(in oklab, oklch(1 0 0) 22%, transparent) transparent;
     -webkit-tap-highlight-color: color-mix(in oklab, var(--brand) 25%, transparent);
   }
-  input, textarea { caret-color: var(--color-brand-bright); }
-  a { text-underline-offset: 0.2em; }
+  input,
+  textarea {
+    caret-color: var(--color-brand-bright);
+  }
+  a {
+    text-underline-offset: 0.2em;
+  }
 
   /*
     Los precios son cifras que se comparan en columna (carrito, desglose,
     totales). Con cifras proporcionales los dígitos bailan de fila en fila.
   */
-  .tabular { font-variant-numeric: tabular-nums; }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 /*
@@ -186,9 +220,30 @@
     animation: karma-fill 1.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
   }
 
+  /*
+    Entrada del hero, en CSS y no en Motion.
+
+    El hero es lo único de la portada que no espera a nada: ni a Supabase ni al
+    chunk de animación. Animarlo con `m.*` lo ataría a que LazyMotion termine de
+    bajar sus features, que es exactamente la espera que la portada evita. Un
+    keyframe pesa cero y corre en el primer frame.
+
+    `both` para que el estado inicial valga antes de que arranque el retraso —
+    sin él la línea aparece, desaparece y vuelve a entrar.
+  */
+  .karma-rise {
+    animation: karma-rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .slider-indicator {
       transition: none;
+    }
+
+    /* El sustituto no es apagar la entrada: es la misma entrada sin
+       desplazamiento, igual que hace `fadeOnly` del lado de Motion. */
+    .karma-rise {
+      animation-name: karma-appear;
     }
 
     .karma-hero-fill {
@@ -237,20 +292,65 @@
     letter-spacing: 0.006em;
     color: var(--color-foreground);
   }
-  .legal-prose p { margin-block: 0 1.25em; }
-  .legal-prose ul { margin-block: 0 1.25em; }
-  .legal-prose li { margin-block-end: 0.5em; }
-  .legal-prose li::marker { color: var(--color-muted-foreground); }
+  .legal-prose p {
+    margin-block: 0 1.25em;
+  }
+  .legal-prose ul {
+    margin-block: 0 1.25em;
+  }
+  .legal-prose li {
+    margin-block-end: 0.5em;
+  }
+  .legal-prose li::marker {
+    color: var(--color-muted-foreground);
+  }
   /* Más aire encima que debajo: el título pertenece a lo que sigue. */
-  .legal-prose h2 { margin-block: 2.5em 0.75em; }
-  .legal-prose h2:first-of-type { margin-block-start: 1.5em; }
-  .legal-prose strong { font-weight: 600; }
-  .legal-prose > :last-child { margin-block-end: 0; }
+  .legal-prose h2 {
+    margin-block: 2.5em 0.75em;
+  }
+  .legal-prose h2:first-of-type {
+    margin-block-start: 1.5em;
+  }
+  .legal-prose strong {
+    font-weight: 600;
+  }
+  .legal-prose > :last-child {
+    margin-block-end: 0;
+  }
 }
 
 @keyframes karma-pulse {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.45; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* Entrada del hero. 28px, el mismo recorrido que usa Motion en las secciones,
+   para que lo que entra al cargar y lo que entra al hacer scroll se muevan
+   igual. */
+@keyframes karma-rise {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Su versión sin desplazamiento, para prefers-reduced-motion. */
+@keyframes karma-appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @layer utilities {
@@ -274,8 +374,16 @@
     outline: 2px solid var(--color-ring);
     outline-offset: -3px;
   }
-  .shadow-card { box-shadow: var(--shadow-card); }
-  .shadow-soft { box-shadow: var(--shadow-soft); }
-  .bg-gradient-brand { background-image: var(--gradient-brand); }
-  .text-balance { text-wrap: balance; }
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+  .shadow-soft {
+    box-shadow: var(--shadow-soft);
+  }
+  .bg-gradient-brand {
+    background-image: var(--gradient-brand);
+  }
+  .text-balance {
+    text-wrap: balance;
+  }
 }
