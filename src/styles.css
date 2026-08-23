@@ -250,23 +250,33 @@
     animation: karma-fill 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
-  /* `both` para que la letra espere apagada durante su retraso en vez de
-     encenderse y volver a apagarse cuando por fin le toca. */
-  .karma-pop {
-    animation: karma-pop 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  /*
+    El veredicto atado al scroll.
+
+    Una sola propiedad, `--p`, dice hasta dónde llegó la cabeza de lectura. La
+    pone JavaScript en el contenedor y la heredan las 429 letras; cada letra
+    sabe su propia posición en `--i` y decide sola. Eso es una escritura por
+    fotograma en un elemento, no cuatrocientas: mover `--p` en el padre es lo
+    único que ocurre mientras alguien hace scroll.
+
+    El valor por defecto es 9999, es decir «ya pasó todo». Si el JavaScript no
+    corre, no carga o falla, el párrafo se ve entero y quieto. El texto nunca
+    depende de que la animación funcione.
+  */
+  .karma-veredicto {
+    --p: 9999;
   }
 
   /*
-    La letra que la ola todavía no ha alcanzado.
-
-    Es una clase y no un `style` en línea por una razón concreta: el bloque de
-    reduced-motion de abajo tiene que poder devolverle la opacidad, y un estilo
-    en línea le gana a la hoja de estilos. Con una clase, quien pide menos
-    movimiento ve el párrafo entero desde el principio sin que haga falta que
-    JavaScript se entere de nada.
+    La letra aparece grande y se asienta. Ambas curvas son monótonas a
+    propósito: una función triangular «crece y vuelve» necesitaría abs(), y de
+    esta forma —entra a 1.32 y encoge hasta 1 mientras sube de opacidad— se lee
+    igual como un golpe, con dos calc() que cualquier navegador resuelve.
   */
-  .karma-pending {
-    opacity: 0;
+  .karma-char {
+    display: inline-block;
+    opacity: clamp(0, calc((var(--p) - var(--i)) / 150), 1);
+    transform: scale(clamp(1, calc(1.32 - (var(--p) - var(--i)) * 0.0008), 1.32));
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -287,14 +297,27 @@
       clip-path: none;
     }
 
-    /* Aquí no hay sustituto que valga: una ola de letras creciendo es
-       movimiento y nada más, no comunica nada que el texto quieto no diga. Se
-       apaga entera y el párrafo queda legible desde el primer momento. */
-    .karma-pop,
-    .karma-pending {
-      animation: none;
+    /*
+      Aquí no hay sustituto que valga: una ola de letras creciendo es movimiento
+      y nada más, no comunica nada que el texto quieto no diga.
+
+      Y con ella se cae también el andamio: sin animación no hay razón para que
+      la sección mida dos pantallas ni para que se quede pegada. El párrafo
+      vuelve a ser un párrafo de altura normal, y quien pidió menos movimiento
+      no tiene que hacer scroll de más para pasar de largo.
+    */
+    .karma-char {
       opacity: 1;
       transform: none;
+    }
+
+    .karma-runway {
+      height: auto;
+    }
+
+    .karma-sticky {
+      position: static;
+      min-height: 0;
     }
 
     .karma-hero-fill {

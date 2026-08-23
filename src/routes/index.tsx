@@ -268,18 +268,19 @@ const VEREDICTO: string[][] = [
 ];
 
 /**
- * El ritmo de la cabeza de lectura.
+ * El ritmo de la cabeza de lectura, ahora medido en scroll y no en tiempo.
  *
- * A velocidad de lectura real —unas 200 palabras por minuto, que son unos 60 ms
- * por carácter— este texto tardaría casi medio minuto en recorrerse entero, y
- * nadie espera de pie a que una animación le dé permiso para leer. La ola va
- * por delante: a 16 ms por letra termina en unos diez segundos, así que cuando
- * vas por la primera frase ya lleva tres de ventaja. El punto sí se respeta,
- * que es lo que hace que se sienta leído y no cronometrado.
+ * Ya no hay reloj: la posición de la página es la que manda. Estos números
+ * dejaron de ser milisegundos y pasaron a ser distancia — cuánto recorrido le
+ * toca a cada letra dentro de la sección. Que el punto siga costando catorce
+ * veces más que una letra es lo que hace que la frase respire donde respira al
+ * leerla en voz alta, sólo que ahora ese respiro se paga con dedo y no con
+ * espera. Quien va rápido llega rápido; nadie se queda mirando.
  */
-const CHAR_MS = 16; // avance por letra
-const PERIOD_MS = 220; // el respiro en el punto
-const LEAD_MS = 260; // deja llegar la sección antes de arrancar
+const CHAR_STEP = 16; // avance por letra
+const PERIOD_STEP = 220; // el respiro en el punto
+const LEAD_STEP = 260; // margen antes de que arranque la primera letra
+const TAIL_STEP = 700; // margen al final: la última frase se lee antes de soltar
 
 /**
  * El texto partido en párrafos → palabras → letras, con el retraso de cada
@@ -293,35 +294,42 @@ const LEAD_MS = 260; // deja llegar la sección antes de arrancar
  * mantiene el corte donde el idioma lo espera.
  */
 const VEREDICTO_TIMED = (() => {
-  let acc = LEAD_MS;
-  return VEREDICTO.map((parrafo) =>
+  let acc = LEAD_STEP;
+  const parrafos = VEREDICTO.map((parrafo) =>
     parrafo.map((frase) => {
       const palabras = frase.split(" ").map((palabra) => {
         const letras = [...palabra].map((letra) => {
-          const delay = acc;
-          acc += CHAR_MS;
-          return { letra, delay };
+          const pos = acc;
+          acc += CHAR_STEP;
+          return { letra, pos };
         });
-        acc += CHAR_MS; // el espacio también ocupa su turno
+        acc += CHAR_STEP; // el espacio también ocupa su turno
         return letras;
       });
-      acc += PERIOD_MS;
+      acc += PERIOD_STEP;
       return { palabras, texto: frase };
     }),
   );
+  return { parrafos, total: acc + TAIL_STEP };
 })();
 
 /**
- * El texto no aparece: lo recorre una cabeza de lectura que va agrandando cada
- * letra a su paso y la deja encendida.
+ * El texto se lee al ritmo del scroll: la página avanza, la cabeza de lectura
+ * avanza con ella, y cada letra aparece grande y se asienta a su paso.
  *
- * Las letras que la ola no ha tocado todavía no están: aparecen a su paso. Eso
- * deja al lector rápido esperando a la animación, que es un coste real y una
- * decisión tomada a propósito — la portada es donde la marca puede permitirse
- * gastar un segundo en verse bien. El texto para lector de pantalla, en cambio,
- * está completo desde el primer fotograma; ahí no se esconde nada nunca.
+ * Es scroll ligado, no scroll secuestrado, y la diferencia importa. Nadie
+ * bloquea la rueda ni el dedo: la sección simplemente es alta y se queda pegada
+ * mientras se la recorre, así que pasar por encima del texto *es* revelarlo.
+ * Quien va con prisa lo llena de un manotazo y sigue; quien vuelve atrás lo ve
+ * rebobinar. Atrapar el scroll habría roto el teclado, peleado con el impulso
+ * del dedo en móvil, y contradicho el principio 2 de PRODUCT.md — cualquier
+ * paso metido delante del pedido se cuenta como pérdida.
  *
- * Dos cosas que parecen detalle y no lo son:
+ * Tres cosas que parecen detalle y no lo son:
+ *
+ * El coste por fotograma es una escritura, no cuatrocientas. `--p` vive en el
+ * contenedor y baja por herencia; cada letra lleva su `--i` fijo y resuelve su
+ * propia opacidad y escala en CSS. Mover el scroll sólo toca el padre.
  *
  * El crecimiento va por `transform` y jamás por `font-size`. Cambiar el tamaño
  * de fuente de una letra cambia su caja, empuja a las vecinas y vuelve a partir
@@ -334,55 +342,94 @@ const VEREDICTO_TIMED = (() => {
  * el texto de verdad; los spans son decoración.
  */
 function Veredicto() {
-  const ref = useRef<HTMLElement>(null);
-  // 0.4 y no 0.25: la ola debe arrancar cuando el párrafo se está mirando, no
-  // cuando asoma su primera línea por el borde de la pantalla.
-  const encendido = useInViewOnce(ref, 0.4);
+  const pistaRef = useRef<HTMLElement>(null);
+  const textoRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const pista = pistaRef.current;
+    const texto = textoRef.current;
+    if (!pista || !texto) return;
+
+    // Si el navegador no puede hacer sticky, la sección se queda alta y el
+    // texto pasaría de largo sin encenderse. Mejor dejarlo encendido y quieto.
+    if (!CSS.supports?.("position", "sticky")) {
+      texto.style.setProperty("--p", String(VEREDICTO_TIMED.total));
+      return;
+    }
+
+    let pendiente = 0;
+
+    const medir = () => {
+      pendiente = 0;
+      const caja = pista.getBoundingClientRect();
+      // Recorrido útil: lo que sobra de la pista una vez descontada la pantalla
+      // que se queda pegada.
+      const recorrido = caja.height - window.innerHeight;
+      const avance = recorrido > 0 ? Math.min(Math.max(-caja.top, 0), recorrido) / recorrido : 1;
+      texto.style.setProperty("--p", (avance * VEREDICTO_TIMED.total).toFixed(1));
+    };
+
+    const alHacerScroll = () => {
+      // Un rAF como mucho por fotograma: el scroll dispara muy por encima de la
+      // tasa de refresco y medir de más no pinta ni un pixel de más.
+      if (!pendiente) pendiente = requestAnimationFrame(medir);
+    };
+
+    medir();
+    window.addEventListener("scroll", alHacerScroll, { passive: true });
+    window.addEventListener("resize", alHacerScroll);
+    return () => {
+      window.removeEventListener("scroll", alHacerScroll);
+      window.removeEventListener("resize", alHacerScroll);
+      if (pendiente) cancelAnimationFrame(pendiente);
+    };
+  }, []);
 
   return (
-    <section ref={ref} className="max-w-5xl mx-auto px-4 py-20 sm:py-28">
-      {/* Aquí había un «EL VEREDICTO» en versalitas encima del texto. Fuera: un
-          rótulo sobre un bloque no le añade nada que el bloque no diga solo, y
-          «Karma no es un castigo.» abre mejor que una etiqueta que anuncia que
-          va a abrir algo. */}
-      {/* 34rem: la medida de lectura del sistema. El contenedor de 64rem es casi
-          un tercio demasiado ancho para prosa seguida. */}
-      <div className="max-w-[34rem] space-y-5 text-base leading-[1.75] tracking-[0.006em]">
-        {VEREDICTO_TIMED.map((parrafo, i) => (
-          <p key={i}>
-            {/* La versión que lee la gente con lector de pantalla. */}
-            <span className="sr-only">{parrafo.map((f) => f.texto).join(" ")}</span>
+    // La altura es el reloj: dos pantallas y media de recorrido para las
+    // cuatrocientas letras. Más corto y la ola va tan rápida que no se lee;
+    // más largo y la sección se convierte en un peaje.
+    <section ref={pistaRef} className="karma-runway relative h-[250vh]">
+      <div className="karma-sticky sticky top-0 flex min-h-[100svh] items-center">
+        {/* Aquí había un «EL VEREDICTO» en versalitas encima del texto. Fuera:
+            un rótulo sobre un bloque no le añade nada que el bloque no diga
+            solo, y «Karma no es un castigo.» abre mejor que una etiqueta que
+            anuncia que va a abrir algo. */}
+        <div
+          ref={textoRef}
+          className="karma-veredicto mx-auto w-full max-w-5xl px-4 py-20 sm:py-28"
+        >
+          {/* 34rem: la medida de lectura del sistema. El contenedor de 64rem es
+              casi un tercio demasiado ancho para prosa seguida. */}
+          <div className="max-w-[34rem] space-y-5 text-base leading-[1.75] tracking-[0.006em]">
+            {VEREDICTO_TIMED.parrafos.map((parrafo, i) => (
+              <p key={i}>
+                {/* La versión que lee la gente con lector de pantalla. */}
+                <span className="sr-only">{parrafo.map((f) => f.texto).join(" ")}</span>
 
-            <span aria-hidden="true">
-              {parrafo.map(({ palabras, texto }) =>
-                palabras.map((letras, k) => (
-                  // El espacio va fuera del `inline-block` y como texto normal:
-                  // es el único punto donde la línea puede partir, y la palabra
-                  // en bloque es lo que impide que parta entre dos letras.
-                  <Fragment key={`${texto}-${k}`}>
-                    <span className="inline-block whitespace-nowrap">
-                      {letras.map(({ letra, delay }, l) => (
-                        <span
-                          key={l}
-                          // `karma-pending` en vez de un opacity en línea: el
-                          // bloque de reduced-motion tiene que poder devolver
-                          // la opacidad, y un estilo en línea le gana siempre a
-                          // la hoja de estilos.
-                          className={
-                            encendido ? "karma-pop inline-block" : "karma-pending inline-block"
-                          }
-                          style={encendido ? { animationDelay: `${delay}ms` } : undefined}
-                        >
-                          {letra}
-                        </span>
-                      ))}
-                    </span>{" "}
-                  </Fragment>
-                )),
-              )}
-            </span>
-          </p>
-        ))}
+                <span aria-hidden="true">
+                  {parrafo.map(({ palabras, texto }) =>
+                    palabras.map((letras, k) => (
+                      // El espacio va fuera del `inline-block` y como texto
+                      // normal: es el único punto donde la línea puede partir,
+                      // y la palabra en bloque es lo que impide que parta entre
+                      // dos letras.
+                      <Fragment key={`${texto}-${k}`}>
+                        <span className="inline-block whitespace-nowrap">
+                          {letras.map(({ letra, pos }, l) => (
+                            <span key={l} className="karma-char" style={{ "--i": pos } as never}>
+                              {letra}
+                            </span>
+                          ))}
+                        </span>{" "}
+                      </Fragment>
+                    )),
+                  )}
+                </span>
+              </p>
+            ))}
+          </div>
+        </div>
       </div>
     </section>
   );
