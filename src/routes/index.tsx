@@ -478,13 +478,18 @@ function Destacados() {
                 key={p.id}
                 to="/menu/$categoria"
                 params={{ categoria: p.categorias[0] ?? "todos" }}
-                // Escalonado corto y con tope: tres platos a 90 ms son 180 ms
+                // Escalonado corto y con tope: tres platos a 110 ms son 220 ms
                 // de cola. Un escalonado que se nota esperando deja de leerse
                 // como una lista llegando y empieza a leerse como lentitud.
-                className={`focus-ring group bg-card rounded-2xl overflow-hidden border border-border/60 shadow-card hover:-translate-y-0.5 transition ${
-                  visto ? "karma-rise" : "karma-pending"
+                //
+                // `transition-transform` y no `transition` a secas: la segunda
+                // incluiría box-shadow, y entonces el halo del hover tardaría
+                // en encenderse igual que tarda en subir la tarjeta. El calor
+                // responde al dedo antes que el movimiento.
+                className={`focus-ring group bg-card rounded-2xl overflow-hidden border border-border/60 hover:-translate-y-0.5 transition-transform ${
+                  visto ? "karma-plato" : "karma-pending"
                 }`}
-                style={visto ? { animationDelay: `${i * 90}ms` } : undefined}
+                style={visto ? { animationDelay: `${i * 110}ms` } : undefined}
               >
                 <div className="aspect-square bg-muted overflow-hidden">
                   {p.foto ? (

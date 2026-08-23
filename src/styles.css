@@ -268,6 +268,41 @@
   }
 
   /*
+    `backwards` y no `both`, que sería lo primero que uno escribe.
+
+    Con `both` el valor del 100 % se queda pegado al elemento, y una declaración
+    de animación le gana a cualquier regla normal en la cascada: el halo más
+    caliente del `:hover` no se vería nunca. Con `backwards` la animación sólo
+    sostiene el estado inicial durante su retraso y suelta el elemento al
+    terminar, que vuelve a su `shadow-card` de siempre. El 100 % del keyframe
+    vale exactamente eso, así que el relevo no se nota.
+  */
+  .karma-plato {
+    animation: karma-ignite 700ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    /*
+      El halo en reposo lo pone esta clase y no la utilidad `shadow-card`, que
+      es lo que había. Las utilidades de Tailwind viven en `@layer utilities` y
+      esa capa gana a `@layer base` pase lo que pase con la especificidad, así
+      que `.shadow-card` machacaba el `:hover` de aquí abajo y el halo caliente
+      no se encendía nunca. Con las dos reglas en la misma capa, la cascada
+      vuelve a hacer lo que uno espera.
+    */
+    box-shadow: var(--shadow-card);
+  }
+
+  /* Y al tocarlo, arde un poco más. Es el mismo gesto de la entrada, sostenido
+     mientras el dedo o el puntero siguen encima. */
+  .karma-plato:hover {
+    box-shadow: 0 8px 30px -2px color-mix(in oklab, var(--brand) 45%, transparent);
+  }
+
+  /* Lo que aún no ha entrado en pantalla. Clase y no un `opacity-0` suelto para
+     que el bloque de reduced-motion de abajo pueda devolverlo. */
+  .karma-pending {
+    opacity: 0;
+  }
+
+  /*
     La letra aparece grande y se asienta. Ambas curvas son monótonas a
     propósito: una función triangular «crece y vuelve» necesitaría abs(), y de
     esta forma —entra a 1.32 y encoge hasta 1 mientras sube de opacidad— se lee
@@ -318,6 +353,16 @@
     .karma-sticky {
       position: static;
       min-height: 0;
+    }
+
+    /* El plato no sube ni prende: ya está servido y con su halo puesto. Se
+       conserva el rojo, que es información de marca, y se quita el viaje. */
+    .karma-plato,
+    .karma-pending {
+      animation: none;
+      opacity: 1;
+      transform: none;
+      box-shadow: var(--shadow-card);
     }
 
     .karma-hero-fill {
@@ -414,6 +459,38 @@
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+/*
+  El plato llega caliente.
+
+  DESIGN.md dice que en este sistema la luz roja emite y no eleva: el halo bajo
+  una tarjeta es el objeto ardiendo, no el objeto flotando. Esta sección son los
+  platos que más piden, así que lo que se anima es justamente eso — la tarjeta
+  sube, y al posarse se le enciende el rojo por debajo.
+
+  El halo se pasa de rosca antes de asentarse (55 % de marca en el pico, 30 % en
+  reposo). Un halo que sube derecho hasta su valor final se lee como una sombra
+  apareciendo; uno que se pasa y vuelve se lee como algo que prende.
+*/
+@keyframes karma-ignite {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+    box-shadow: 0 0 0 0 transparent;
+  }
+  55% {
+    opacity: 1;
+    transform: none;
+  }
+  72% {
+    box-shadow: 0 8px 34px -2px color-mix(in oklab, var(--brand) 55%, transparent);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+    box-shadow: var(--shadow-card);
   }
 }
 
