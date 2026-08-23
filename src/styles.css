@@ -235,10 +235,38 @@
     animation: karma-rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
+  /*
+    El veredicto entrando: el mismo barrido de abajo hacia arriba que llena la
+    marca, aplicado al texto.
+
+    Es deliberadamente el keyframe `karma-fill` y no uno nuevo. El sistema ya
+    tenía un gesto con autoría —el clip-path llenando el logo como una jarra— y
+    no lo usaba en ningún otro sitio. Extenderlo de la marca a la frase hace que
+    una sola idea material sostenga la portada entera, en lugar de cuatro
+    efectos distintos que no se conocen entre sí. Sube en la misma dirección y
+    significa lo mismo: algo que se va llenando, una sentencia que se dicta.
+  */
+  .karma-wipe {
+    animation: karma-fill 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
   /* `both` para que la letra espere apagada durante su retraso en vez de
      encenderse y volver a apagarse cuando por fin le toca. */
   .karma-pop {
     animation: karma-pop 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  /*
+    La letra que la ola todavía no ha alcanzado.
+
+    Es una clase y no un `style` en línea por una razón concreta: el bloque de
+    reduced-motion de abajo tiene que poder devolverle la opacidad, y un estilo
+    en línea le gana a la hoja de estilos. Con una clase, quien pide menos
+    movimiento ve el párrafo entero desde el principio sin que haga falta que
+    JavaScript se entere de nada.
+  */
+  .karma-pending {
+    opacity: 0;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -247,15 +275,23 @@
     }
 
     /* El sustituto no es apagar la entrada: es la misma entrada sin
-       desplazamiento, igual que hace `fadeOnly` del lado de Motion. */
+       desplazamiento. */
     .karma-rise {
       animation-name: karma-appear;
+    }
+
+    /* El barrido es recorrido espacial; su equivalente quieto es que la frase
+       simplemente aparezca. La sentencia sigue llegando, sin el viaje. */
+    .karma-wipe {
+      animation-name: karma-appear;
+      clip-path: none;
     }
 
     /* Aquí no hay sustituto que valga: una ola de letras creciendo es
        movimiento y nada más, no comunica nada que el texto quieto no diga. Se
        apaga entera y el párrafo queda legible desde el primer momento. */
-    .karma-pop {
+    .karma-pop,
+    .karma-pending {
       animation: none;
       opacity: 1;
       transform: none;

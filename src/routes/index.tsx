@@ -1,9 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { LazyMotion, m, useInView, useReducedMotion } from "motion/react";
+import { Fragment, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useAppState } from "@/lib/app-store";
 import { getIsOpen, groupSchedule } from "@/lib/schedule";
-import { loadDomAnimation, fadeUp, fadeOnly } from "@/lib/motion";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ImageOff, Instagram, MapPin, Clock, ArrowRight } from "lucide-react";
@@ -21,54 +19,56 @@ const MARCA = "/apple-touch-icon.png";
 
 function LandingPage() {
   return (
-    // El proveedor va aquí y no en __root: /menu no tiene por qué pagar los
-    // bytes de la animación de la portada. Ver la nota larga en lib/motion.ts.
-    <LazyMotion features={loadDomAnimation} strict>
-      <div className="min-h-screen">
-        <LandingHeader />
-        <main>
-          <Hero />
-          <Veredicto />
-          <Destacados />
-          <DondeYCuando />
-        </main>
-        <SiteFooter />
-      </div>
-    </LazyMotion>
+    <div className="min-h-screen">
+      <LandingHeader />
+      <main>
+        <Hero />
+        <Veredicto />
+        <Destacados />
+        <DondeYCuando />
+      </main>
+      <SiteFooter />
+    </div>
   );
 }
 
 /**
- * Entrada de sección: sube y aparece, o sólo aparece si el sistema lo pide.
+ * ¿Ya se vio esto? Una vez que sí, para siempre sí.
  *
- * `useInView` + `animate` y no `whileInView`, que es la forma corta y la que
- * uno escribiría primero. `whileInView` lo sirve la feature `inView`, y esa no
- * viene ni en `domAnimation` ni en `domMax` — sólo en el `motion` completo. Bajo
- * `LazyMotion` no falla ruidosamente: la prop se ignora y la sección se queda en
- * su estado inicial, es decir invisible para siempre. `useInView` es un hook
- * suelto sobre IntersectionObserver, no necesita feature alguna, y así el bundle
- * de animación se queda donde está.
+ * Veinte líneas en vez de `useInView` de Motion. No es purismo: importar ese
+ * hook arrastra el runtime de Motion al chunk de esta ruta, y con el barrido y
+ * la ola resueltos en CSS no quedaba nada más que lo necesitara. La portada
+ * pasó a no cargar librería de animación alguna, que es exactamente lo que
+ * conviene en la pantalla que abre alguien con datos móviles.
  *
- * `once` porque una sección que se re-anima cada vez que vuelve a entrar en
- * pantalla convierte el scroll en un juguete.
+ * Sin `IntersectionObserver` se da por visto de entrada. Es la decisión
+ * correcta en la dirección segura: en el peor caso alguien se pierde una
+ * animación, nunca un párrafo.
  */
-function Seccion({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  const reduce = useReducedMotion();
-  const preset = reduce ? fadeOnly : fadeUp;
-  const ref = useRef<HTMLElement>(null);
-  const visible = useInView(ref, { once: true, amount: 0.25 });
+function useInViewOnce(ref: RefObject<Element | null>, amount = 0.4) {
+  const [visto, setVisto] = useState(false);
 
-  return (
-    <m.section
-      ref={ref}
-      initial={preset.initial}
-      animate={visible ? preset.animate : preset.initial}
-      transition={preset.transition}
-      className={className}
-    >
-      {children}
-    </m.section>
-  );
+  useEffect(() => {
+    if (visto) return;
+    const el = ref.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setVisto(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      ([entrada]) => {
+        if (!entrada.isIntersecting) return;
+        setVisto(true);
+        io.disconnect();
+      },
+      { threshold: amount },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [ref, amount, visto]);
+
+  return visto;
 }
 
 /** Chip de estado: verde abre, rojo cierra. Devuelve null mientras el horario
@@ -164,15 +164,18 @@ function Hero() {
     // Sin datos de por medio: tipografía, un PNG de disco y nada más. Lo que
     // hay debajo puede esperar a Supabase; esto no.
     <section className="min-h-[100svh] flex flex-col items-center justify-center px-4 text-center">
-      {/* El relleno del loader, una vez. Es el gesto con autoría de la marca y
-          no se inventa uno nuevo para la portada. Capa gris debajo, capa a
-          color revelándose de abajo hacia arriba encima. */}
       {/*
-        La entrada escalonada va en CSS (`karma-rise`) y no en Motion: el hero
-        no espera al chunk de animación, así que su propia animación tampoco
-        puede depender de él. Los retrasos son cortos — la marca, la frase, la
-        explicación, el botón — y el conjunto termina antes de los 1.2 s, que
-        es más o menos lo que alguien tarda en decidir si se queda.
+        La secuencia con autoría de la portada: se dicta una sentencia.
+
+        La marca se llena, la acusación sube, un compás, y sube el premio. Todo
+        con el mismo barrido de clip-path de abajo hacia arriba — el gesto que
+        el sistema ya tenía en el loader y que no usaba en ningún otro sitio.
+        Una sola idea material sostiene la pantalla en vez de cuatro efectos
+        que no se conocen entre sí.
+
+        Los tiempos se solapan a propósito: encadenados de verdad esto duraría
+        tres segundos y se sentiría una cola. Solapados se lee como un gesto
+        continuo y termina sobre los 1.6 s.
       */}
       <div className="karma-rise relative h-24 w-24 sm:h-28 sm:w-28 mb-8">
         <img
@@ -202,24 +205,27 @@ function Hero() {
         se leen mejor una después de la otra que las dos de golpe.
       */}
       <h1 className="font-display font-bold text-brand-bright text-balance leading-[1.05] text-[clamp(2rem,8.5vw,4.5rem)]">
-        <span className="karma-rise block" style={{ animationDelay: "0.15s" }}>
+        {/* `inline-block` en cada línea porque el clip-path recorta la caja del
+            elemento, y una caja de línea inline no tiene la altura de su texto:
+            sin esto el barrido corta por donde no es. */}
+        <span className="karma-wipe block" style={{ animationDelay: "0.35s" }}>
           Sabes lo que hiciste.
         </span>
-        <span className="karma-rise block" style={{ animationDelay: "0.35s" }}>
+        <span className="karma-wipe block" style={{ animationDelay: "0.68s" }}>
           Te lo mereces hoy.
         </span>
       </h1>
 
       <p
         className="karma-rise mt-5 max-w-md text-base sm:text-lg text-muted-foreground"
-        style={{ animationDelay: "0.55s" }}
+        style={{ animationDelay: "1.05s" }}
       >
         Hamburguesas, asados y picadas. Pedido directo por WhatsApp, sin apps de por medio.
       </p>
 
       <div
         className="karma-rise mt-8 flex flex-col items-center gap-4"
-        style={{ animationDelay: "0.7s" }}
+        style={{ animationDelay: "1.2s" }}
       >
         <Link
           to="/menu"
@@ -328,23 +334,20 @@ const VEREDICTO_TIMED = (() => {
  * el texto de verdad; los spans son decoración.
  */
 function Veredicto() {
-  const reduce = useReducedMotion();
   const ref = useRef<HTMLElement>(null);
   // 0.4 y no 0.25: la ola debe arrancar cuando el párrafo se está mirando, no
   // cuando asoma su primera línea por el borde de la pantalla.
-  const encendido = useInView(ref, { once: true, amount: 0.4 });
+  const encendido = useInViewOnce(ref, 0.4);
 
   return (
     <section ref={ref} className="max-w-5xl mx-auto px-4 py-20 sm:py-28">
-      {/* El tratamiento «Stamp» de DESIGN.md: Anton diminuto con tracking
-          extremo. Está reservado para momentos de ceremonia y aparece una sola
-          vez en la página — el loader, que es su otro uso, no vive en esta ruta. */}
-      <p className="font-display text-[0.6875rem] tracking-[0.35em] text-muted-foreground">
-        El veredicto
-      </p>
+      {/* Aquí había un «EL VEREDICTO» en versalitas encima del texto. Fuera: un
+          rótulo sobre un bloque no le añade nada que el bloque no diga solo, y
+          «Karma no es un castigo.» abre mejor que una etiqueta que anuncia que
+          va a abrir algo. */}
       {/* 34rem: la medida de lectura del sistema. El contenedor de 64rem es casi
           un tercio demasiado ancho para prosa seguida. */}
-      <div className="mt-6 max-w-[34rem] space-y-5 text-base leading-[1.75] tracking-[0.006em]">
+      <div className="max-w-[34rem] space-y-5 text-base leading-[1.75] tracking-[0.006em]">
         {VEREDICTO_TIMED.map((parrafo, i) => (
           <p key={i}>
             {/* La versión que lee la gente con lector de pantalla. */}
@@ -361,16 +364,14 @@ function Veredicto() {
                       {letras.map(({ letra, delay }, l) => (
                         <span
                           key={l}
-                          className={reduce ? "inline-block" : "karma-pop inline-block"}
-                          style={
-                            reduce
-                              ? undefined
-                              : encendido
-                                ? { animationDelay: `${delay}ms` }
-                                : // Antes de entrar en pantalla la letra no
-                                  // existe todavía. Aparece cuando le toca.
-                                  { animation: "none", opacity: 0 }
+                          // `karma-pending` en vez de un opacity en línea: el
+                          // bloque de reduced-motion tiene que poder devolver
+                          // la opacidad, y un estilo en línea le gana siempre a
+                          // la hoja de estilos.
+                          className={
+                            encendido ? "karma-pop inline-block" : "karma-pending inline-block"
                           }
+                          style={encendido ? { animationDelay: `${delay}ms` } : undefined}
                         >
                           {letra}
                         </span>
@@ -390,6 +391,9 @@ function Veredicto() {
 function Destacados() {
   const { state, loading } = useAppState();
 
+  const ref = useRef<HTMLElement>(null);
+  const visto = useInViewOnce(ref, 0.2);
+
   const platos: Product[] = useMemo(() => {
     const disponibles = state.productos.filter((p) => p.disponible);
     const marcados = disponibles.filter((p) => p.destacado);
@@ -403,7 +407,10 @@ function Destacados() {
   if (!loading && platos.length === 0) return null;
 
   return (
-    <Seccion className="max-w-5xl mx-auto px-4 py-20 sm:py-28">
+    // La sección entera ya no entra flotando. Antes las tres secciones de abajo
+    // hacían exactamente la misma subida, que es un tic, no un lenguaje: lo que
+    // aquí aparece es una lista, así que lo que se escalona son sus platos.
+    <section ref={ref} className="max-w-5xl mx-auto px-4 py-20 sm:py-28">
       <h2 className="font-display text-2xl sm:text-3xl font-bold">Lo que nos piden</h2>
       <p className="mt-2 text-muted-foreground">Y lo que deberías pedir tú.</p>
 
@@ -419,12 +426,18 @@ function Destacados() {
                 </div>
               </div>
             ))
-          : platos.map((p) => (
+          : platos.map((p, i) => (
               <Link
                 key={p.id}
                 to="/menu/$categoria"
                 params={{ categoria: p.categorias[0] ?? "todos" }}
-                className="focus-ring group bg-card rounded-2xl overflow-hidden border border-border/60 shadow-card hover:-translate-y-0.5 transition"
+                // Escalonado corto y con tope: tres platos a 90 ms son 180 ms
+                // de cola. Un escalonado que se nota esperando deja de leerse
+                // como una lista llegando y empieza a leerse como lentitud.
+                className={`focus-ring group bg-card rounded-2xl overflow-hidden border border-border/60 shadow-card hover:-translate-y-0.5 transition ${
+                  visto ? "karma-rise" : "karma-pending"
+                }`}
+                style={visto ? { animationDelay: `${i * 90}ms` } : undefined}
               >
                 <div className="aspect-square bg-muted overflow-hidden">
                   {p.foto ? (
@@ -457,7 +470,7 @@ function Destacados() {
       >
         Ver la carta completa <ArrowRight className="h-4 w-4" />
       </Link>
-    </Seccion>
+    </section>
   );
 }
 
@@ -471,7 +484,10 @@ function DondeYCuando() {
   const direccion = (state.config.direccion ?? "").trim();
 
   return (
-    <Seccion className="max-w-5xl mx-auto px-4 py-20 sm:py-28">
+    // Sin entrada. Esta sección son horarios y una dirección: datos que alguien
+    // viene a comprobar, no un momento que haya que presentar. Animarla sólo
+    // porque está ahí es lo que convierte una portada en una feria.
+    <section className="max-w-5xl mx-auto px-4 py-20 sm:py-28">
       <h2 className="font-display text-2xl sm:text-3xl font-bold">Cuándo y dónde</h2>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 max-w-3xl">
@@ -532,6 +548,6 @@ function DondeYCuando() {
           </a>
         )}
       </div>
-    </Seccion>
+    </section>
   );
 }
