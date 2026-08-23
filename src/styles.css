@@ -235,6 +235,12 @@
     animation: karma-rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
+  /* `both` para que la letra espere apagada durante su retraso en vez de
+     encenderse y volver a apagarse cuando por fin le toca. */
+  .karma-pop {
+    animation: karma-pop 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .slider-indicator {
       transition: none;
@@ -244,6 +250,15 @@
        desplazamiento, igual que hace `fadeOnly` del lado de Motion. */
     .karma-rise {
       animation-name: karma-appear;
+    }
+
+    /* Aquí no hay sustituto que valga: una ola de letras creciendo es
+       movimiento y nada más, no comunica nada que el texto quieto no diga. Se
+       apaga entera y el párrafo queda legible desde el primer momento. */
+    .karma-pop {
+      animation: none;
+      opacity: 1;
+      transform: none;
     }
 
     .karma-hero-fill {
@@ -350,6 +365,33 @@
   }
   to {
     opacity: 1;
+  }
+}
+
+/*
+  El golpe de cada letra cuando le pasa la cabeza de lectura.
+
+  Crece con `transform` y nunca con `font-size`. Es la diferencia entre que la
+  letra se hinche sobre el texto quieto y que el párrafo entero se recomponga:
+  `font-size` cambia la caja, empuja a las vecinas y parte las líneas de nuevo
+  en cada fotograma. `transform` se pinta en el compositor y no toca el layout,
+  así que el texto se queda donde está mientras la ola lo recorre.
+
+  Termina en scale(1) y opacidad 1: el golpe es de paso, lo que queda es la
+  letra normal ya encendida.
+*/
+@keyframes karma-pop {
+  0% {
+    opacity: 0;
+    transform: scale(1);
+  }
+  35% {
+    opacity: 1;
+    transform: scale(1.32);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 

@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { LazyMotion, m, useInView, useReducedMotion } from "motion/react";
 import { useAppState } from "@/lib/app-store";
 import { getIsOpen, groupSchedule } from "@/lib/schedule";
@@ -262,50 +262,76 @@ const VEREDICTO: string[][] = [
 ];
 
 /**
- * El ritmo del barrido.
+ * El ritmo de la cabeza de lectura.
  *
- * A velocidad de lectura real —unas 200 palabras por minuto, 300 ms por
- * palabra— este texto tardaría veintisiete segundos en encenderse entero, y
- * nadie espera eso. Así que el barrido va por delante del lector, a unas cuatro
- * veces esa velocidad: cuando terminas la primera frase la tercera ya está
- * encendida. El punto sí se respeta, que es lo que hace que se sienta leído y
- * no cronometrado.
+ * A velocidad de lectura real —unas 200 palabras por minuto, que son unos 60 ms
+ * por carácter— este texto tardaría casi medio minuto en recorrerse entero, y
+ * nadie espera de pie a que una animación le dé permiso para leer. La ola va
+ * por delante: a 16 ms por letra termina en unos diez segundos, así que cuando
+ * vas por la primera frase ya lleva tres de ventaja. El punto sí se respeta,
+ * que es lo que hace que se sienta leído y no cronometrado.
  */
-const WORD_MS = 70; // avance por palabra
-const PERIOD_MS = 190; // el respiro en el punto
+const CHAR_MS = 16; // avance por letra
+const PERIOD_MS = 220; // el respiro en el punto
 const LEAD_MS = 260; // deja llegar la sección antes de arrancar
 
-/** Retraso acumulado de cada frase, calculado una vez: el texto es constante. */
+/**
+ * El texto partido en párrafos → palabras → letras, con el retraso de cada
+ * letra ya calculado. Se hace una vez al cargar el módulo porque el texto es
+ * constante; rehacerlo en cada render sería trabajo por nada.
+ *
+ * La palabra existe como nivel intermedio por una razón de maquetación, no de
+ * animación: cada letra tiene que ser `inline-block` para poder escalar, y una
+ * fila de `inline-block` sueltos se puede partir entre dos letras cualesquiera
+ * al final de la línea. Envolver cada palabra y prohibirle el salto dentro
+ * mantiene el corte donde el idioma lo espera.
+ */
 const VEREDICTO_TIMED = (() => {
   let acc = LEAD_MS;
   return VEREDICTO.map((parrafo) =>
     parrafo.map((frase) => {
-      const delay = acc;
-      acc += frase.trim().split(/\s+/).length * WORD_MS + PERIOD_MS;
-      return { frase, delay };
+      const palabras = frase.split(" ").map((palabra) => {
+        const letras = [...palabra].map((letra) => {
+          const delay = acc;
+          acc += CHAR_MS;
+          return { letra, delay };
+        });
+        acc += CHAR_MS; // el espacio también ocupa su turno
+        return letras;
+      });
+      acc += PERIOD_MS;
+      return { palabras, texto: frase };
     }),
   );
 })();
 
 /**
- * El texto no aparece: se enciende.
+ * El texto no aparece: lo recorre una cabeza de lectura que va agrandando cada
+ * letra a su paso y la deja encendida.
  *
- * Es la diferencia entre esto y un reveal, y es deliberada. En un karaoke la
- * letra entera está a la vista y lo que se mueve es el resaltado — nunca te
- * esconde la línea siguiente. Aplicado aquí eso significa que quien lee rápido
- * puede adelantarse, que un lector de pantalla encuentra el párrafo completo en
- * el DOM desde el primer momento, y que si alguien llega a mitad del barrido no
- * se encuentra media página en blanco.
+ * Las letras que la ola no ha tocado todavía no están: aparecen a su paso. Eso
+ * deja al lector rápido esperando a la animación, que es un coste real y una
+ * decisión tomada a propósito — la portada es donde la marca puede permitirse
+ * gastar un segundo en verse bien. El texto para lector de pantalla, en cambio,
+ * está completo desde el primer fotograma; ahí no se esconde nada nunca.
  *
- * El barrido son transiciones CSS con `transition-delay` escalonado y no
- * temporizadores en JS: se disparan solas cuando `encendido` cambia, corren en
- * el compositor y no cuestan un re-render por frase.
+ * Dos cosas que parecen detalle y no lo son:
+ *
+ * El crecimiento va por `transform` y jamás por `font-size`. Cambiar el tamaño
+ * de fuente de una letra cambia su caja, empuja a las vecinas y vuelve a partir
+ * las líneas en cada fotograma: el párrafo entero temblaría mientras pasa la
+ * ola. `transform` no toca el layout.
+ *
+ * Y el texto animado va `aria-hidden` con una copia limpia al lado para el
+ * lector de pantalla. Partir un párrafo en cuatrocientos spans de una letra es
+ * exactamente la clase de cosa que hace que VoiceOver lo deletree. La copia es
+ * el texto de verdad; los spans son decoración.
  */
 function Veredicto() {
   const reduce = useReducedMotion();
   const ref = useRef<HTMLElement>(null);
-  // 0.4 y no 0.25: el barrido debe arrancar cuando el párrafo se está mirando,
-  // no cuando asoma su primera línea por el borde de la pantalla.
+  // 0.4 y no 0.25: la ola debe arrancar cuando el párrafo se está mirando, no
+  // cuando asoma su primera línea por el borde de la pantalla.
   const encendido = useInView(ref, { once: true, amount: 0.4 });
 
   return (
@@ -321,21 +347,39 @@ function Veredicto() {
       <div className="mt-6 max-w-[34rem] space-y-5 text-base leading-[1.75] tracking-[0.006em]">
         {VEREDICTO_TIMED.map((parrafo, i) => (
           <p key={i}>
-            {parrafo.map(({ frase, delay }) => (
-              <span
-                key={frase}
-                // Apagado a 0.4 y no a 0: a cero esto sería un reveal con otro
-                // nombre. A 0.4 la frase que todavía no llega se lee igual, sólo
-                // que en segundo plano, como la letra que aún no cantas.
-                className="transition-opacity duration-[450ms] ease-out"
-                style={{
-                  opacity: reduce || encendido ? 1 : 0.4,
-                  transitionDelay: reduce ? "0ms" : `${delay}ms`,
-                }}
-              >
-                {frase}{" "}
-              </span>
-            ))}
+            {/* La versión que lee la gente con lector de pantalla. */}
+            <span className="sr-only">{parrafo.map((f) => f.texto).join(" ")}</span>
+
+            <span aria-hidden="true">
+              {parrafo.map(({ palabras, texto }) =>
+                palabras.map((letras, k) => (
+                  // El espacio va fuera del `inline-block` y como texto normal:
+                  // es el único punto donde la línea puede partir, y la palabra
+                  // en bloque es lo que impide que parta entre dos letras.
+                  <Fragment key={`${texto}-${k}`}>
+                    <span className="inline-block whitespace-nowrap">
+                      {letras.map(({ letra, delay }, l) => (
+                        <span
+                          key={l}
+                          className={reduce ? "inline-block" : "karma-pop inline-block"}
+                          style={
+                            reduce
+                              ? undefined
+                              : encendido
+                                ? { animationDelay: `${delay}ms` }
+                                : // Antes de entrar en pantalla la letra no
+                                  // existe todavía. Aparece cuando le toca.
+                                  { animation: "none", opacity: 0 }
+                          }
+                        >
+                          {letra}
+                        </span>
+                      ))}
+                    </span>{" "}
+                  </Fragment>
+                )),
+              )}
+            </span>
           </p>
         ))}
       </div>
