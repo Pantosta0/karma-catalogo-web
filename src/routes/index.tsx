@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { LazyMotion, m, useReducedMotion } from "motion/react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { LazyMotion, m, useInView, useReducedMotion } from "motion/react";
 import { useAppState } from "@/lib/app-store";
 import { getIsOpen, groupSchedule } from "@/lib/schedule";
 import { loadDomAnimation, fadeUp, fadeOnly } from "@/lib/motion";
@@ -38,18 +38,32 @@ function LandingPage() {
   );
 }
 
-/** Entrada de sección: sube y aparece, o sólo aparece si el sistema lo pide.
- *  `once` porque una sección que se re-anima cada vez que vuelve a entrar en
- *  pantalla convierte el scroll en un juguete. */
+/**
+ * Entrada de sección: sube y aparece, o sólo aparece si el sistema lo pide.
+ *
+ * `useInView` + `animate` y no `whileInView`, que es la forma corta y la que
+ * uno escribiría primero. `whileInView` lo sirve la feature `inView`, y esa no
+ * viene ni en `domAnimation` ni en `domMax` — sólo en el `motion` completo. Bajo
+ * `LazyMotion` no falla ruidosamente: la prop se ignora y la sección se queda en
+ * su estado inicial, es decir invisible para siempre. `useInView` es un hook
+ * suelto sobre IntersectionObserver, no necesita feature alguna, y así el bundle
+ * de animación se queda donde está.
+ *
+ * `once` porque una sección que se re-anima cada vez que vuelve a entrar en
+ * pantalla convierte el scroll en un juguete.
+ */
 function Seccion({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   const reduce = useReducedMotion();
   const preset = reduce ? fadeOnly : fadeUp;
+  const ref = useRef<HTMLElement>(null);
+  const visible = useInView(ref, { once: true, amount: 0.25 });
+
   return (
     <m.section
+      ref={ref}
       initial={preset.initial}
-      whileInView={preset.animate}
+      animate={visible ? preset.animate : preset.initial}
       transition={preset.transition}
-      viewport={{ once: true, amount: 0.25 }}
       className={className}
     >
       {children}
