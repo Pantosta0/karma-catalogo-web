@@ -1,95 +1,100 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState, useEffect, useRef, forwardRef } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useAppState } from "@/lib/app-store";
-import { supabase } from "@/lib/supabase";
-import { useCart, formatCOP } from "@/lib/cart";
-import {
-  getDiscountedPrice,
-  isDiscounted,
-  validateCode,
-  calcCodeDiscount,
-  type AppliedCode,
-} from "@/lib/pricing";
-import type { Product, DaySchedule } from "@/lib/storage";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { ShoppingCart, Plus, Minus, Trash2, ImageOff, Send, Settings, X, Clock } from "lucide-react";
-import { LoadingScreen } from "@/components/LoadingScreen";
+import { getIsOpen, groupSchedule } from "@/lib/schedule";
+import { SiteFooter } from "@/components/SiteFooter";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ImageOff, Instagram, MapPin, Clock, ArrowRight } from "lucide-react";
+import type { Product } from "@/lib/storage";
 
-// Calcula si el negocio está abierto ahora según el horario (zona horaria Bogotá)
-function getIsOpen(schedule: DaySchedule[] | undefined): boolean | null {
-  if (!schedule || schedule.length !== 7) return null;
-  // Forzar hora de Bogotá (UTC-5) independientemente del dispositivo del cliente
-  const bogota = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Bogota" }));
-  const ds = schedule[bogota.getDay()]; // 0=Dom
-  if (!ds) return null;
-  if (!ds.open) return false;
-  const [fh, fm] = ds.from.split(":").map(Number);
-  const [th, tm] = ds.to.split(":").map(Number);
-  const mins = bogota.getHours() * 60 + bogota.getMinutes();
-  return mins >= fh * 60 + fm && mins <= th * 60 + tm;
-}
-
-// Devuelve cuándo abre el negocio la próxima vez (texto legible)
-function getNextOpeningTime(schedule: DaySchedule[]): string | null {
-  if (!schedule || schedule.length !== 7) return null;
-  const bogota = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Bogota" }));
-  const todayDay = bogota.getDay();
-  const todayMins = bogota.getHours() * 60 + bogota.getMinutes();
-  const dayNames = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
-
-  // Quizás hoy aún abra más tarde
-  const todayDs = schedule[todayDay];
-  if (todayDs?.open) {
-    const [fh, fm] = todayDs.from.split(":").map(Number);
-    if (todayMins < fh * 60 + fm) return `hoy a las ${todayDs.from}`;
-  }
-
-  // Siguiente día con horario abierto
-  for (let i = 1; i <= 7; i++) {
-    const dayIdx = (todayDay + i) % 7;
-    const ds = schedule[dayIdx];
-    if (ds?.open) {
-      const label = i === 1 ? "mañana" : `el ${dayNames[dayIdx]}`;
-      return `${label} a las ${ds.from}`;
-    }
-  }
-  return null;
-}
-
-// El título del catálogo lo define __root a partir del nombre configurado en
-// el panel; las etiquetas para crawlers viven en index.html.
 export const Route = createFileRoute("/")({
-  component: CatalogPage,
+  component: LandingPage,
 });
 
-function CatalogPage() {
-  // El catálogo es sólo lectura: ya no escribe estado global.
-  const { state, loading } = useAppState();
-  const cart = useCart(state.productos, !loading);
-  const [activeCat, setActiveCat] = useState<string>("todos");
-  const [selected, setSelected] = useState<Product | null>(null);
-  const [cartOpen, setCartOpen] = useState(false);
-  const [checkoutOpen, setCheckoutOpen] = useState(false);
-  const [promoOpen, setPromoOpen] = useState(false);
-  const [activePromo, setActivePromo] = useState<(typeof state.promos)[0] | null>(null);
-  const [closedOpen, setClosedOpen] = useState(false);
-  const [appliedCode, setAppliedCode] = useState<AppliedCode | null>(null);
+/** La marca en su tamaño nativo. El logo de alta resolución vive en la fila de
+ *  `config` como base64 (~700 kB entre los dos) y no vale bloquear la portada
+ *  por él; este archivo son 47 kB y ya está en disco. A 180 px de origen
+ *  cualquier tamaño de pintado por debajo se ve nítido. */
+const MARCA = "/apple-touch-icon.png";
 
-  // El estado abierto/cerrado se reevalúa cada 30s y al volver a la pestaña.
-  // Sin esto, quien deja el menú abierto sigue viendo "Abierto" pasada la hora
-  // de cierre y alcanza a mandar un pedido que la cocina ya no recibe.
+function LandingPage() {
+  return (
+    <div className="min-h-screen">
+      <LandingHeader />
+      <main>
+        <Hero />
+        <Veredicto />
+        <Destacados />
+        <DondeYCuando />
+      </main>
+      <SiteFooter />
+    </div>
+  );
+}
+
+/**
+ * ¿Ya se vio esto? Una vez que sí, para siempre sí.
+ *
+ * Veinte líneas en vez de `useInView` de Motion. No es purismo: importar ese
+ * hook arrastra el runtime de Motion al chunk de esta ruta, y con el barrido y
+ * la ola resueltos en CSS no quedaba nada más que lo necesitara. La portada
+ * pasó a no cargar librería de animación alguna, que es exactamente lo que
+ * conviene en la pantalla que abre alguien con datos móviles.
+ *
+ * Sin `IntersectionObserver` se da por visto de entrada. Es la decisión
+ * correcta en la dirección segura: en el peor caso alguien se pierde una
+ * animación, nunca un párrafo.
+ */
+function useInViewOnce(ref: RefObject<Element | null>, amount = 0.4) {
+  const [visto, setVisto] = useState(false);
+
+  useEffect(() => {
+    if (visto) return;
+    const el = ref.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setVisto(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      ([entrada]) => {
+        if (!entrada.isIntersecting) return;
+        setVisto(true);
+        io.disconnect();
+      },
+      { threshold: amount },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [ref, amount, visto]);
+
+  return visto;
+}
+
+/** Chip de estado: verde abre, rojo cierra. Devuelve null mientras el horario
+ *  real no haya llegado — el horario por defecto del código no es el de Karma,
+ *  y anunciar «Abierto» por adivinanza es peor que no decir nada. */
+function EstadoChip({ isOpen }: { isOpen: boolean | null }) {
+  if (isOpen === null) return null;
+  return (
+    <span
+      className={`text-[11px] font-bold px-2.5 py-1 rounded-full shrink-0 ${
+        isOpen
+          ? "bg-green-500/20 text-green-400 border border-green-500/30"
+          : "bg-red-500/20 text-red-400 border border-red-500/30"
+      }`}
+    >
+      {isOpen ? "Abierto" : "Cerrado"}
+    </span>
+  );
+}
+
+/** Reloj compartido: el estado abierto/cerrado se recalcula cada 30 s y al
+ *  volver a la pestaña, igual que en el menú. */
+function useIsOpenNow() {
+  const { state, loading } = useAppState();
   const [now, setNow] = useState(() => Date.now());
+
   useEffect(() => {
     const tick = () => setNow(Date.now());
     const id = window.setInterval(tick, 30_000);
@@ -102,944 +107,499 @@ function CatalogPage() {
     };
   }, []);
 
-  const isOpen = useMemo(
-    () => getIsOpen(state.config.schedule),
-    // `now` es la señal de reloj: fuerza el recálculo cada tick.
+  return useMemo(
+    () => (loading ? null : getIsOpen(state.config.schedule)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [state.config.schedule, now],
+    [state.config.schedule, loading, now],
   );
-  const pillRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
-  const barRef = useRef<HTMLDivElement>(null);
-  const [slider, setSlider] = useState<{ left: number; width: number } | null>(null);
+}
 
-  // Mover el indicador deslizante al pill activo.
-  //
-  // Se vuelve a medir en tres momentos, no solo al cambiar de categoría:
-  // al redimensionar o rotar (los pills cambian de sitio), cuando termina de
-  // cargar Anton/Barlow desde Google Fonts (los anchos cambian bajo el
-  // indicador ya dibujado) y cuando cambia la lista de categorías.
+function LandingHeader() {
+  const { state } = useAppState();
+  const isOpen = useIsOpenNow();
+  const [scrolled, setScrolled] = useState(false);
+
+  // Transparente sobre el hero, sólida en cuanto se despega. Un listener
+  // simple y no `useScroll`: esto es un booleano, no un valor continuo.
   useEffect(() => {
-    const measure = (scroll = false) => {
-      const el = pillRefs.current.get(activeCat);
-      if (!el) return;
-      setSlider({ left: el.offsetLeft, width: el.offsetWidth });
-      if (scroll) el.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
-    };
-
-    measure(true);
-
-    const bar = barRef.current;
-    const ro = bar ? new ResizeObserver(() => measure()) : null;
-    if (bar && ro) ro.observe(bar);
-
-    let cancelled = false;
-    document.fonts?.ready.then(() => { if (!cancelled) measure(); });
-
-    return () => {
-      cancelled = true;
-      ro?.disconnect();
-    };
-  }, [activeCat, state.categorias]);
-
-  // Mostrar promo activa una vez por sesión
-  useEffect(() => {
-    if (loading) return;
-    const today = new Date().toISOString().slice(0, 10);
-    const promo = state.promos?.find(
-      (p) => p.activo && today >= p.desde && today <= p.hasta
-    ) ?? null;
-    if (promo && !sessionStorage.getItem(`karma_promo_${promo.id}`)) {
-      setActivePromo(promo);
-      setPromoOpen(true);
-    }
-  }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Popup de cerrado — una vez por sesión, solo cuando el horario está
-  // configurado. Depende de isOpen para que también aparezca si el negocio
-  // cierra con el menú ya abierto, no solo al entrar.
-  useEffect(() => {
-    if (loading || isOpen !== false) return;
-    if (sessionStorage.getItem("karma_closed_shown")) return;
-    sessionStorage.setItem("karma_closed_shown", "1");
-    setClosedOpen(true);
-  }, [loading, isOpen]);
-
-  // ⚠️ Todos los hooks deben ir ANTES de cualquier return condicional
-  const visibles = useMemo(
-    () => state.productos.filter((p) => p.disponible && (activeCat === "todos" || p.categorias.includes(activeCat))),
-    [state.productos, activeCat],
-  );
-
-  // Subtotal ajustado con descuentos por producto
-  const productDiscountTotal = cart.items.reduce(
-    (acc, i) => acc + (i.product.precio - getDiscountedPrice(i.product)) * i.cantidad,
-    0,
-  );
-  const discountedSubtotal = cart.subtotal - productDiscountTotal;
-  const codeDiscountAmount = appliedCode ? calcCodeDiscount(appliedCode, discountedSubtotal) : 0;
-  // Domicilio se suma DESPUÉS de descuentos, no es afectado por códigos
-  const deliveryFee = state.config.deliveryFee ?? 5000;
-  const totalFinal = discountedSubtotal - codeDiscountAmount + deliveryFee;
-
-  const logoUrl = state.config.logoSquare;
-  const logoHeaderUrl = state.config.logoRect || state.config.logoSquare;
-
-  if (loading) return <LoadingScreen logoUrl={logoUrl} />;
+    const onScroll = () => setScrolled(window.scrollY > 24);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   return (
-    <div className="min-h-screen [padding-bottom:calc(8rem+env(safe-area-inset-bottom))]">
-      {/* Saltar la barra de categorías, que en teclado son N tabuladas antes
-          de llegar a un solo producto. */}
-      <a
-        href="#menu"
-        className="focus-ring sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-card focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-foreground"
+    <header
+      className={`fixed top-0 inset-x-0 z-30 transition-colors duration-300 ${
+        scrolled
+          ? "backdrop-blur-md bg-background/85 border-b border-border/60"
+          : "border-b border-transparent"
+      }`}
+    >
+      <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
+        <img src={MARCA} alt="" aria-hidden="true" className="h-10 w-10 object-contain shrink-0" />
+        <span className="font-display text-xl text-brand-bright leading-none">
+          {state.config.nombre || "Karma"}
+        </span>
+        <EstadoChip isOpen={isOpen} />
+        <div className="flex-1" />
+        {/* Crema, no el degradado: es el momento en que la portada entrega al
+            visitante lo que vino a buscar. Ver «The Cream Rule» en DESIGN.md. */}
+        <Link
+          to="/menu"
+          className="focus-ring inline-flex h-11 items-center rounded-full bg-secondary px-5 text-sm font-bold text-secondary-foreground hover:opacity-90 transition"
+        >
+          Pedir
+        </Link>
+      </div>
+    </header>
+  );
+}
+
+function Hero() {
+  const { state } = useAppState();
+  const isOpen = useIsOpenNow();
+
+  return (
+    // Sin datos de por medio: tipografía, un PNG de disco y nada más. Lo que
+    // hay debajo puede esperar a Supabase; esto no.
+    <section className="min-h-[100svh] flex flex-col items-center justify-center px-4 text-center">
+      {/*
+        La secuencia con autoría de la portada: se dicta una sentencia.
+
+        La marca se llena, la acusación sube, un compás, y sube el premio. Todo
+        con el mismo barrido de clip-path de abajo hacia arriba — el gesto que
+        el sistema ya tenía en el loader y que no usaba en ningún otro sitio.
+        Una sola idea material sostiene la pantalla en vez de cuatro efectos
+        que no se conocen entre sí.
+
+        Los tiempos se solapan a propósito: encadenados de verdad esto duraría
+        tres segundos y se sentiría una cola. Solapados se lee como un gesto
+        continuo y termina sobre los 1.6 s.
+      */}
+      <div className="karma-rise relative h-24 w-24 sm:h-28 sm:w-28 mb-8">
+        <img
+          src={MARCA}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 h-full w-full object-contain"
+          style={{ filter: "grayscale(1) brightness(0.35)" }}
+        />
+        <img
+          src={MARCA}
+          alt={state.config.nombre || "Karma"}
+          fetchPriority="high"
+          className="karma-hero-fill absolute inset-0 h-full w-full object-contain"
+        />
+      </div>
+
+      {/*
+        Dos líneas, una por frase, forzadas con `block`.
+
+        Anton nunca pasa de dos líneas en móvil (DESIGN.md), y dejar que el
+        navegador decida dónde parte esta frase da tres en cuanto la pantalla
+        es estrecha. Partirla por la puntuación es además donde la partiría
+        alguien leyéndola en voz alta.
+
+        Cada frase entra por separado: es una acusación y luego el premio, y
+        se leen mejor una después de la otra que las dos de golpe.
+      */}
+      <h1 className="font-display font-bold text-brand-bright text-balance leading-[1.05] text-[clamp(2rem,8.5vw,4.5rem)]">
+        {/* `inline-block` en cada línea porque el clip-path recorta la caja del
+            elemento, y una caja de línea inline no tiene la altura de su texto:
+            sin esto el barrido corta por donde no es. */}
+        <span className="karma-wipe block" style={{ animationDelay: "0.35s" }}>
+          Sabes lo que hiciste.
+        </span>
+        <span className="karma-wipe block" style={{ animationDelay: "0.68s" }}>
+          Te lo mereces hoy.
+        </span>
+      </h1>
+
+      <p
+        className="karma-rise mt-5 max-w-md text-base sm:text-lg text-muted-foreground"
+        style={{ animationDelay: "1.05s" }}
       >
-        Saltar al menú
-      </a>
+        Hamburguesas, asados y picadas. Pedido directo por WhatsApp, sin apps de por medio.
+      </p>
 
-      {/* Header */}
-      <header className="sticky top-0 z-30 backdrop-blur-md bg-background/85 border-b border-border/60">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-          {logoHeaderUrl ? (
-            // El logo lo sube el dueño y su proporción es desconocida, así que
-            // width/height afirmarían una relación que puede ser falsa. En su
-            // lugar se reserva el hueco: alto fijo y un ancho mínimo, para que
-            // la insignia de abierto/cerrado no salte cuando la imagen decodifica.
-            <span className="flex h-12 sm:h-14 min-w-12 sm:min-w-14 items-center shrink-0">
-              <img
-                src={logoHeaderUrl}
-                alt={state.config.nombre}
-                fetchPriority="high"
-                decoding="async"
-                className="h-full w-auto max-w-40 object-contain object-left"
-              />
-            </span>
-          ) : (
-            // Sin logo cargado: el nombre hace de marca. Un src vacío haría
-            // que el navegador volviera a pedir la página entera.
-            <span className="font-display text-xl sm:text-2xl text-brand-bright leading-none">
-              {state.config.nombre}
-            </span>
-          )}
-          {isOpen !== null && (
-            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full shrink-0 ${
-              isOpen
-                ? "bg-green-500/20 text-green-400 border border-green-500/30"
-                : "bg-red-500/20 text-red-400 border border-red-500/30"
-            }`}>
-              {isOpen ? "Abierto" : "Cerrado"}
-            </span>
-          )}
-          <div className="flex-1" />
-          <Link
-            to="/admin"
-            aria-label="Panel de administración"
-            className="focus-ring h-11 w-11 rounded-full flex items-center justify-center text-muted-foreground hover:text-brand-bright hover:bg-muted transition"
-          >
-            <Settings className="h-5 w-5" />
-          </Link>
-          <Sheet open={cartOpen} onOpenChange={setCartOpen}>
-            <SheetTrigger asChild>
-              <button
-                className="focus-ring relative inline-flex items-center justify-center h-11 w-11 rounded-full bg-primary text-primary-foreground shadow-card hover:scale-105 transition"
-                aria-label="Carrito"
-              >
-                <ShoppingCart className="h-5 w-5" />
-                {cart.count > 0 && (
-                  <span className="absolute -top-1 -right-1 h-5 min-w-5 px-1 rounded-full bg-secondary text-secondary-foreground text-[11px] font-bold flex items-center justify-center">
-                    {cart.count}
-                  </span>
-                )}
-              </button>
-            </SheetTrigger>
-            <CartSheet
-              items={cart.items}
-              subtotal={cart.subtotal}
-              productDiscountTotal={productDiscountTotal}
-              appliedCode={appliedCode}
-              codeDiscountAmount={codeDiscountAmount}
-              deliveryFee={deliveryFee}
-              totalFinal={totalFinal}
-              onApplyCode={setAppliedCode}
-              setQty={cart.setQty}
-              remove={cart.remove}
-              onCheckout={() => {
-                setCartOpen(false);
-                setCheckoutOpen(true);
-              }}
-            />
-          </Sheet>
-        </div>
+      <div
+        className="karma-rise mt-8 flex flex-col items-center gap-4"
+        style={{ animationDelay: "1.2s" }}
+      >
+        <Link
+          to="/menu"
+          className="focus-ring inline-flex h-12 items-center justify-center rounded-md bg-gradient-brand px-8 text-base font-bold text-brand-foreground shadow-card hover:opacity-95 transition"
+        >
+          Ver el menú
+        </Link>
+        <EstadoChip isOpen={isOpen} />
+      </div>
+    </section>
+  );
+}
 
-        {/* Category bar */}
-        <div className="max-w-5xl mx-auto px-4 pb-3 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <div ref={barRef} className="relative flex gap-2 min-w-max">
-            {/*
-              Indicador deslizante. El desplazamiento —el movimiento que se ve—
-              va por `transform`, que corre en el compositor. El ancho sigue
-              siendo `width` a propósito: la alternativa (`scaleX`) deforma los
-              extremos de una píldora completamente redondeada y los deja como
-              elipses durante toda la transición. Es un único nodo hoja,
-              absoluto y sin hijos, así que el relayout no toca el documento.
-            */}
-            {slider && (
-              <div
-                aria-hidden="true"
-                className="slider-indicator absolute top-0 bottom-0 left-0 rounded-full bg-primary shadow-soft pointer-events-none"
-                style={{
-                  transform: `translate3d(${slider.left}px, 0, 0)`,
-                  width: slider.width,
-                }}
-              />
-            )}
-            <CategoryPill
-              active={activeCat === "todos"}
-              ref={(el) => { if (el) pillRefs.current.set("todos", el); else pillRefs.current.delete("todos"); }}
-              onClick={() => setActiveCat("todos")}
-            >
-              Todos
-            </CategoryPill>
-            {state.categorias.map((c) => (
-              <CategoryPill
-                key={c.id}
-                active={activeCat === c.id}
-                ref={(el) => { if (el) pillRefs.current.set(c.id, el); else pillRefs.current.delete(c.id); }}
-                onClick={() => setActiveCat(c.id)}
-              >
-                {c.nombre}
-              </CategoryPill>
+/**
+ * El veredicto, frase por frase, para el barrido de lectura.
+ *
+ * Partido a mano y no con un `split(/\./)`: el texto tiene dos puntos, rayas y
+ * un «11:00» de vecino, y una expresión regular que hoy acierta se rompe con la
+ * próxima edición. Además así se decide dónde respira la frase, que es la mitad
+ * del efecto — «Aquí no preguntamos.» aguanta sola, y la enumeración larga que
+ * la sigue pasa de corrido.
+ */
+const VEREDICTO: string[][] = [
+  ["Karma no es un castigo.", "Es una cuenta que se salda."],
+  [
+    "Tuviste una semana larga.",
+    "Cerraste el mes.",
+    "Sobreviviste el lunes.",
+    "Lo que sea que hiciste —y sabes lo que hiciste— hoy vuelve en forma de hamburguesa.",
+  ],
+  [
+    "Aquí no preguntamos.",
+    "Parrilla, candela y una carta corta: hamburguesas que no piden permiso, asados como en casa, desgranados que llenan de verdad y picadas para cuando son varios.",
+  ],
+  [
+    "Y pides directo.",
+    "Sin apps de por medio, sin nadie cobrando comisión encima de tu comida.",
+    "Escribes por WhatsApp y te responde la cocina.",
+  ],
+];
+
+/**
+ * El ritmo de la cabeza de lectura, ahora medido en scroll y no en tiempo.
+ *
+ * Ya no hay reloj: la posición de la página es la que manda. Estos números
+ * dejaron de ser milisegundos y pasaron a ser distancia — cuánto recorrido le
+ * toca a cada letra dentro de la sección. Que el punto siga costando catorce
+ * veces más que una letra es lo que hace que la frase respire donde respira al
+ * leerla en voz alta, sólo que ahora ese respiro se paga con dedo y no con
+ * espera. Quien va rápido llega rápido; nadie se queda mirando.
+ */
+const CHAR_STEP = 16; // avance por letra
+const PERIOD_STEP = 220; // el respiro en el punto
+const LEAD_STEP = 260; // margen antes de que arranque la primera letra
+const TAIL_STEP = 700; // margen al final: la última frase se lee antes de soltar
+
+/**
+ * El texto partido en párrafos → palabras → letras, con el retraso de cada
+ * letra ya calculado. Se hace una vez al cargar el módulo porque el texto es
+ * constante; rehacerlo en cada render sería trabajo por nada.
+ *
+ * La palabra existe como nivel intermedio por una razón de maquetación, no de
+ * animación: cada letra tiene que ser `inline-block` para poder escalar, y una
+ * fila de `inline-block` sueltos se puede partir entre dos letras cualesquiera
+ * al final de la línea. Envolver cada palabra y prohibirle el salto dentro
+ * mantiene el corte donde el idioma lo espera.
+ */
+const VEREDICTO_TIMED = (() => {
+  let acc = LEAD_STEP;
+  const parrafos = VEREDICTO.map((parrafo) =>
+    parrafo.map((frase) => {
+      const palabras = frase.split(" ").map((palabra) => {
+        const letras = [...palabra].map((letra) => {
+          const pos = acc;
+          acc += CHAR_STEP;
+          return { letra, pos };
+        });
+        acc += CHAR_STEP; // el espacio también ocupa su turno
+        return letras;
+      });
+      acc += PERIOD_STEP;
+      return { palabras, texto: frase };
+    }),
+  );
+  return { parrafos, total: acc + TAIL_STEP };
+})();
+
+/**
+ * El texto se lee al ritmo del scroll: la página avanza, la cabeza de lectura
+ * avanza con ella, y cada letra aparece grande y se asienta a su paso.
+ *
+ * Es scroll ligado, no scroll secuestrado, y la diferencia importa. Nadie
+ * bloquea la rueda ni el dedo: la sección simplemente es alta y se queda pegada
+ * mientras se la recorre, así que pasar por encima del texto *es* revelarlo.
+ * Quien va con prisa lo llena de un manotazo y sigue; quien vuelve atrás lo ve
+ * rebobinar. Atrapar el scroll habría roto el teclado, peleado con el impulso
+ * del dedo en móvil, y contradicho el principio 2 de PRODUCT.md — cualquier
+ * paso metido delante del pedido se cuenta como pérdida.
+ *
+ * Tres cosas que parecen detalle y no lo son:
+ *
+ * El coste por fotograma es una escritura, no cuatrocientas. `--p` vive en el
+ * contenedor y baja por herencia; cada letra lleva su `--i` fijo y resuelve su
+ * propia opacidad y escala en CSS. Mover el scroll sólo toca el padre.
+ *
+ * El crecimiento va por `transform` y jamás por `font-size`. Cambiar el tamaño
+ * de fuente de una letra cambia su caja, empuja a las vecinas y vuelve a partir
+ * las líneas en cada fotograma: el párrafo entero temblaría mientras pasa la
+ * ola. `transform` no toca el layout.
+ *
+ * Y el texto animado va `aria-hidden` con una copia limpia al lado para el
+ * lector de pantalla. Partir un párrafo en cuatrocientos spans de una letra es
+ * exactamente la clase de cosa que hace que VoiceOver lo deletree. La copia es
+ * el texto de verdad; los spans son decoración.
+ */
+function Veredicto() {
+  const pistaRef = useRef<HTMLElement>(null);
+  const textoRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const pista = pistaRef.current;
+    const texto = textoRef.current;
+    if (!pista || !texto) return;
+
+    // Si el navegador no puede hacer sticky, la sección se queda alta y el
+    // texto pasaría de largo sin encenderse. Mejor dejarlo encendido y quieto.
+    if (!CSS.supports?.("position", "sticky")) {
+      texto.style.setProperty("--p", String(VEREDICTO_TIMED.total));
+      return;
+    }
+
+    let pendiente = 0;
+
+    const medir = () => {
+      pendiente = 0;
+      const caja = pista.getBoundingClientRect();
+      // Recorrido útil: lo que sobra de la pista una vez descontada la pantalla
+      // que se queda pegada.
+      const recorrido = caja.height - window.innerHeight;
+      const avance = recorrido > 0 ? Math.min(Math.max(-caja.top, 0), recorrido) / recorrido : 1;
+      texto.style.setProperty("--p", (avance * VEREDICTO_TIMED.total).toFixed(1));
+    };
+
+    const alHacerScroll = () => {
+      // Un rAF como mucho por fotograma: el scroll dispara muy por encima de la
+      // tasa de refresco y medir de más no pinta ni un pixel de más.
+      if (!pendiente) pendiente = requestAnimationFrame(medir);
+    };
+
+    medir();
+    window.addEventListener("scroll", alHacerScroll, { passive: true });
+    window.addEventListener("resize", alHacerScroll);
+    return () => {
+      window.removeEventListener("scroll", alHacerScroll);
+      window.removeEventListener("resize", alHacerScroll);
+      if (pendiente) cancelAnimationFrame(pendiente);
+    };
+  }, []);
+
+  return (
+    // La altura es el reloj: dos pantallas y media de recorrido para las
+    // cuatrocientas letras. Más corto y la ola va tan rápida que no se lee;
+    // más largo y la sección se convierte en un peaje.
+    <section ref={pistaRef} className="karma-runway relative h-[250vh]">
+      <div className="karma-sticky sticky top-0 flex min-h-[100svh] items-center">
+        {/* Aquí había un «EL VEREDICTO» en versalitas encima del texto. Fuera:
+            un rótulo sobre un bloque no le añade nada que el bloque no diga
+            solo, y «Karma no es un castigo.» abre mejor que una etiqueta que
+            anuncia que va a abrir algo. */}
+        <div
+          ref={textoRef}
+          className="karma-veredicto mx-auto w-full max-w-5xl px-4 py-20 sm:py-28"
+        >
+          {/* 34rem: la medida de lectura del sistema. El contenedor de 64rem es
+              casi un tercio demasiado ancho para prosa seguida. */}
+          <div className="max-w-[34rem] space-y-5 text-base leading-[1.75] tracking-[0.006em]">
+            {VEREDICTO_TIMED.parrafos.map((parrafo, i) => (
+              <p key={i}>
+                {/* La versión que lee la gente con lector de pantalla. */}
+                <span className="sr-only">{parrafo.map((f) => f.texto).join(" ")}</span>
+
+                <span aria-hidden="true">
+                  {parrafo.map(({ palabras, texto }) =>
+                    palabras.map((letras, k) => (
+                      // El espacio va fuera del `inline-block` y como texto
+                      // normal: es el único punto donde la línea puede partir,
+                      // y la palabra en bloque es lo que impide que parta entre
+                      // dos letras.
+                      <Fragment key={`${texto}-${k}`}>
+                        <span className="inline-block whitespace-nowrap">
+                          {letras.map(({ letra, pos }, l) => (
+                            <span key={l} className="karma-char" style={{ "--i": pos } as never}>
+                              {letra}
+                            </span>
+                          ))}
+                        </span>{" "}
+                      </Fragment>
+                    )),
+                  )}
+                </span>
+              </p>
             ))}
           </div>
         </div>
-      </header>
-
-      <main className="max-w-5xl mx-auto px-4">
-        {/* Hero strip */}
-        <section className="pt-6 pb-4">
-          <h1 className="text-2xl sm:text-3xl font-display font-bold text-brand-bright text-balance">
-            Sabes lo que hiciste. Te lo mereces hoy.
-          </h1>
-          <p className="text-sm sm:text-base text-muted-foreground mt-1">
-            Elige tu pedido y envíalo directo por WhatsApp.
-          </p>
-        </section>
-
-        {/* Product grid - 3 col instagram-like */}
-        <section id="menu" aria-labelledby="menu-heading" className="scroll-mt-32">
-          {/* El grid pasaba de h1 a h3 sin nivel intermedio. Este h2 cierra el
-              salto y nombra la región para lectores de pantalla. */}
-          <h2 id="menu-heading" className="sr-only">
-            {activeCat === "todos"
-              ? "Todos los productos"
-              : state.categorias.find((c) => c.id === activeCat)?.nombre ?? "Productos"}
-          </h2>
-          {visibles.length === 0 ? (
-            <div className="text-center py-20">
-              <p className="text-muted-foreground">
-                {activeCat === "todos"
-                  ? "El menú está vacío por ahora. Vuelve en un rato."
-                  : "Nada disponible en esta categoría ahora mismo."}
-              </p>
-              {activeCat !== "todos" && (
-                <button
-                  onClick={() => setActiveCat("todos")}
-                  className="focus-ring mt-3 text-sm font-semibold text-brand-bright hover:underline underline-offset-4"
-                >
-                  Ver todo el menú
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
-              {visibles.map((p) => (
-                <ProductCard key={p.id} product={p} onOpen={() => setSelected(p)} onAdd={() => cart.add(p, 1)} />
-              ))}
-            </div>
-          )}
-        </section>
-      </main>
-
-      {/* Floating cart button (mobile) */}
-      {cart.count > 0 && (
-        <button
-          onClick={() => setCartOpen(true)}
-          // bottom con safe-area: en iPhone con indicador de inicio, un
-          // bottom-4 seco deja la barra dentro de la zona del gesto.
-          style={{ bottom: "max(1rem, calc(env(safe-area-inset-bottom) + 0.5rem))" }}
-          className="focus-ring fixed left-4 right-4 mx-auto max-w-md z-20 bg-gradient-brand text-brand-foreground rounded-full px-5 py-4 shadow-card flex items-center justify-between font-semibold"
-        >
-          <span className="flex items-center gap-2">
-            <ShoppingCart className="h-5 w-5" /> {cart.count} {cart.count === 1 ? "ítem" : "ítems"}
-          </span>
-          <span>{formatCOP(totalFinal)}</span>
-        </button>
-      )}
-
-      {/* Product detail modal */}
-      <ProductModal
-        product={selected}
-        onClose={() => setSelected(null)}
-        onAdd={(qty) => {
-          if (selected) cart.add(selected, qty);
-          setSelected(null);
-        }}
-      />
-
-      {/* Promo popup */}
-      {activePromo && (
-        <Dialog open={promoOpen} onOpenChange={(o) => {
-          if (!o) {
-            sessionStorage.setItem(`karma_promo_${activePromo.id}`, "1");
-            setPromoOpen(false);
-          }
-        }}>
-          <DialogContent className="max-w-sm p-0 overflow-hidden gap-0">
-            {activePromo.imagen && (
-              <div className="aspect-video w-full bg-muted">
-                <img
-                  src={activePromo.imagen}
-                  alt=""
-                  decoding="async"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-            )}
-            <div className="p-5">
-              <DialogHeader>
-                <DialogTitle className="font-display text-xl">{activePromo.titulo}</DialogTitle>
-                {activePromo.descripcion && (
-                  <DialogDescription className="text-muted-foreground whitespace-pre-line">
-                    {activePromo.descripcion}
-                  </DialogDescription>
-                )}
-              </DialogHeader>
-              <Button
-                onClick={() => {
-                  sessionStorage.setItem(`karma_promo_${activePromo.id}`, "1");
-                  setPromoOpen(false);
-                }}
-                className="w-full mt-4 bg-gradient-brand text-brand-foreground"
-              >
-                ¡Entendido!
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {/* Popup de restaurante cerrado */}
-      <Dialog open={closedOpen} onOpenChange={setClosedOpen}>
-        <DialogContent className="max-w-sm text-center">
-          <div className="flex flex-col items-center gap-4 pt-2 pb-1">
-            <div className="h-14 w-14 rounded-full bg-red-500/15 border border-red-500/25 flex items-center justify-center">
-              <Clock className="h-6 w-6 text-red-400" />
-            </div>
-            <DialogHeader className="items-center gap-1">
-              <DialogTitle className="font-display text-xl">Estamos cerrados</DialogTitle>
-              <DialogDescription className="text-muted-foreground text-sm">
-                {(() => {
-                  const next = getNextOpeningTime(state.config.schedule);
-                  return next
-                    ? `Por ahora no estamos tomando pedidos. Abrimos ${next}.`
-                    : "Por ahora no estamos tomando pedidos. Vuelve pronto.";
-                })()}
-              </DialogDescription>
-            </DialogHeader>
-            <Button
-              onClick={() => setClosedOpen(false)}
-              className="w-full bg-gradient-brand text-brand-foreground"
-            >
-              Entendido
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-
-      {/* Checkout modal */}
-      <CheckoutModal
-        open={checkoutOpen}
-        onOpenChange={setCheckoutOpen}
-        items={cart.items}
-        subtotal={cart.subtotal}
-        productDiscountTotal={productDiscountTotal}
-        appliedCode={appliedCode}
-        codeDiscountAmount={codeDiscountAmount}
-        deliveryFee={deliveryFee}
-        totalFinal={totalFinal}
-        whatsapp={state.config.whatsapp}
-        onSent={() => {
-          // Incrementar usos del código si fue aplicado.
-          //
-          // Vía RPC y no con update(): update() dispara un guardado completo
-          // del estado —config, productos, categorías— desde el catálogo
-          // público, que con RLS activo ya no está permitido. La función
-          // toca una sola columna y el incremento es atómico, así que dos
-          // pedidos simultáneos ya no se pisan el contador.
-          if (appliedCode) {
-            const id = appliedCode.id;
-            supabase
-              .rpc("increment_code_usage", { code_id: id })
-              .then(({ error }) => {
-                if (error) console.warn("[promo] no se pudo contar el uso:", error.message);
-              });
-            setAppliedCode(null);
-          }
-          cart.clear();
-          setCheckoutOpen(false);
-        }}
-      />
-
-      {/* Un solo footer: antes eran dos hermanos, y dos landmarks
-          contentinfo compiten en la navegación por lector de pantalla. */}
-      <footer className="mt-16 border-t border-border/40 pt-8 pb-8 max-w-5xl mx-auto px-4 flex flex-col items-center gap-2">
-        <Link
-          to="/politica-de-privacidad-y-uso-de-datos"
-          className="focus-ring rounded text-sm text-muted-foreground hover:text-brand-bright transition-colors"
-        >
-          Política de Privacidad y Uso de Datos
-        </Link>
-        <p className="text-xs text-muted-foreground">
-          © {new Date().getFullYear()} {state.config.nombre}
-        </p>
-      </footer>
-    </div>
-  );
-}
-
-const CategoryPill = forwardRef<
-  HTMLButtonElement,
-  { active: boolean; onClick: () => void; children: React.ReactNode }
->(({ active, onClick, children }, ref) => (
-  <button
-    ref={ref}
-    onClick={onClick}
-    className={`focus-ring relative z-10 px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-colors duration-200 ${
-      active
-        ? "text-primary-foreground"
-        : "text-muted-foreground hover:text-foreground"
-    }`}
-  >
-    {children}
-  </button>
-));
-
-function ProductCard({
-  product,
-  onOpen,
-  onAdd,
-}: {
-  product: Product;
-  onOpen: () => void;
-  onAdd: () => void;
-}) {
-  return (
-    <div className="group relative bg-card rounded-2xl overflow-hidden shadow-card border border-border/60 hover:-translate-y-0.5 transition">
-      {/* inset: la tarjeta recorta con overflow-hidden y un anillo hacia
-          afuera se perdería entero. aria-label porque cuando el producto no
-          tiene foto el contenido es un icono decorativo y el botón se
-          anunciaría sólo como "button". */}
-      <button
-        onClick={onOpen}
-        aria-label={`Ver ${product.nombre}`}
-        className="focus-ring-inset block w-full aspect-square bg-muted overflow-hidden"
-      >
-        {product.foto ? (
-          <img
-            src={product.foto}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            width={600}
-            height={600}
-            className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-            <ImageOff className="h-8 w-8" />
-          </div>
-        )}
-      </button>
-      <div className="p-3 pb-12">
-        <h3 className="font-semibold text-sm sm:text-base leading-tight line-clamp-2">{product.nombre}</h3>
-        {isDiscounted(product) ? (
-          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-            <p className="text-brand-bright font-display font-bold">{formatCOP(getDiscountedPrice(product))}</p>
-            <p className="text-muted-foreground text-xs line-through">{formatCOP(product.precio)}</p>
-            {/* Relleno sólido, no un lavado al 15%: sobre el wash el rojo se
-                quedaba en 4.24:1. Blanco sobre el relleno da 4.56:1. */}
-            <span className="text-[11px] font-bold bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full">
-              -{product.descuento_pct}%
-            </span>
-          </div>
-        ) : (
-          <p className="text-brand-bright font-display font-bold mt-1">{formatCOP(product.precio)}</p>
-        )}
       </div>
-      <button
-        onClick={onAdd}
-        aria-label={`Agregar ${product.nombre}`}
-        className="focus-ring absolute bottom-3 right-3 h-11 w-11 rounded-full bg-secondary text-secondary-foreground shadow-card flex items-center justify-center hover:scale-110 transition"
-      >
-        <Plus className="h-5 w-5" />
-      </button>
-    </div>
+    </section>
   );
 }
 
-function ProductModal({
-  product,
-  onClose,
-  onAdd,
-}: {
-  product: Product | null;
-  onClose: () => void;
-  onAdd: (qty: number) => void;
-}) {
-  const [qty, setQty] = useState(1);
+function Destacados() {
+  const { state, loading } = useAppState();
+
+  const ref = useRef<HTMLElement>(null);
+  const visto = useInViewOnce(ref, 0.2);
+
+  const platos: Product[] = useMemo(() => {
+    const disponibles = state.productos.filter((p) => p.disponible);
+    const marcados = disponibles.filter((p) => p.destacado);
+    // Sin nada marcado la portada no se queda vacía: cae en los primeros con
+    // foto, que es lo que hace que se vea deliberada desde el primer día.
+    const base = marcados.length > 0 ? marcados : disponibles.filter((p) => p.foto);
+    return base.slice(0, 3);
+  }, [state.productos]);
+
+  // Nada disponible y ya cargó: no hay sección que mostrar.
+  if (!loading && platos.length === 0) return null;
+
   return (
-    <Dialog
-      open={!!product}
-      onOpenChange={(o) => {
-        if (!o) {
-          onClose();
-          setQty(1);
-        }
-      }}
-    >
-      {/* Cuando el plato no tiene descripción no se renderiza DialogDescription.
-          Radix avisa por consola salvo que la clave aria-describedby exista con
-          valor undefined, así que hay que pasarla por spread, no por ternario:
-          `aria-describedby={undefined}` y omitir la prop son lo mismo en JSX. */}
-      <DialogContent
-        className="max-w-md p-0 overflow-hidden"
-        {...(product?.descripcion ? {} : { "aria-describedby": undefined })}
-      >
-        {product && (
-          <>
-            <div className="aspect-square bg-muted">
-              {product.foto ? (
-                <img
-                  src={product.foto}
-                  alt={product.nombre}
-                  decoding="async"
-                  width={600}
-                  height={600}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                  <ImageOff className="h-10 w-10" />
-                </div>
-              )}
-            </div>
-            <div className="p-5">
-              <DialogHeader>
-                <DialogTitle className="font-display text-xl">{product.nombre}</DialogTitle>
-                {/* Sin descripción no se inventa una: el relleno genérico
-                    ("Delicioso producto") resta más de lo que aporta. */}
-                {product.descripcion && (
-                  <DialogDescription className="text-muted-foreground">
-                    {product.descripcion}
-                  </DialogDescription>
-                )}
-              </DialogHeader>
-              <div className="mt-4 flex items-center justify-between">
-                <div>
-                  <span className="tabular text-2xl font-display font-bold text-brand-bright">
-                    {formatCOP(getDiscountedPrice(product) * qty)}
-                  </span>
-                  {isDiscounted(product) && (
-                    <p className="text-xs text-muted-foreground line-through">
-                      {formatCOP(product.precio * qty)}
-                    </p>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 bg-muted rounded-full p-1">
-                  <button
-                    onClick={() => setQty(Math.max(1, qty - 1))}
-                    className="focus-ring h-11 w-11 rounded-full bg-card flex items-center justify-center"
-                  >
-                    <Minus className="h-4 w-4" />
-                  </button>
-                  <span className="w-6 text-center font-semibold">{qty}</span>
-                  <button
-                    onClick={() => setQty(qty + 1)}
-                    className="focus-ring h-11 w-11 rounded-full bg-card flex items-center justify-center"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
+    // La sección entera ya no entra flotando. Antes las tres secciones de abajo
+    // hacían exactamente la misma subida, que es un tic, no un lenguaje: lo que
+    // aquí aparece es una lista, así que lo que se escalona son sus platos.
+    <section ref={ref} className="max-w-5xl mx-auto px-4 py-20 sm:py-28">
+      <h2 className="font-display text-2xl sm:text-3xl font-bold">Lo que nos piden</h2>
+      <p className="mt-2 text-muted-foreground">Y lo que deberías pedir tú.</p>
+
+      <div className="mt-8 grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+        {loading
+          ? // Esqueletos y no un loader de pantalla completa: el hero de arriba
+            // ya se leyó, y tapar la página entera lo desperdiciaría.
+            [0, 1, 2].map((i) => (
+              <div key={i} className="bg-card rounded-2xl overflow-hidden border border-border/60">
+                <Skeleton className="aspect-square w-full rounded-none" />
+                <div className="p-3">
+                  <Skeleton className="h-4 w-3/4" />
                 </div>
               </div>
-              <Button
-                onClick={() => {
-                  onAdd(qty);
-                  setQty(1);
-                }}
-                className="w-full mt-5 bg-gradient-brand text-brand-foreground hover:opacity-95"
-                size="lg"
+            ))
+          : platos.map((p, i) => (
+              <Link
+                key={p.id}
+                to="/menu/$categoria"
+                params={{ categoria: p.categorias[0] ?? "todos" }}
+                // Escalonado corto y con tope: tres platos a 110 ms son 220 ms
+                // de cola. Un escalonado que se nota esperando deja de leerse
+                // como una lista llegando y empieza a leerse como lentitud.
+                //
+                // `transition-transform` y no `transition` a secas: la segunda
+                // incluiría box-shadow, y entonces el halo del hover tardaría
+                // en encenderse igual que tarda en subir la tarjeta. El calor
+                // responde al dedo antes que el movimiento.
+                className={`focus-ring group bg-card rounded-2xl overflow-hidden border border-border/60 hover:-translate-y-0.5 transition-transform ${
+                  visto ? "karma-plato" : "karma-pending"
+                }`}
+                style={visto ? { animationDelay: `${i * 110}ms` } : undefined}
               >
-                Agregar al carrito
-              </Button>
-            </div>
-          </>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function CartSheet({
-  items, subtotal, productDiscountTotal, appliedCode, codeDiscountAmount, deliveryFee, totalFinal,
-  onApplyCode, setQty, remove, onCheckout,
-}: {
-  items: ReturnType<typeof useCart>["items"];
-  subtotal: number;
-  productDiscountTotal: number;
-  appliedCode: AppliedCode | null;
-  codeDiscountAmount: number;
-  deliveryFee: number;
-  totalFinal: number;
-  onApplyCode: (c: AppliedCode | null) => void;
-  setQty: (id: string, q: number) => void;
-  remove: (id: string) => void;
-  onCheckout: () => void;
-}) {
-  const [codeInput, setCodeInput] = useState("");
-  const [codeError, setCodeError] = useState("");
-
-  const [validando, setValidando] = useState(false);
-
-  const applyCode = async () => {
-    if (!codeInput.trim() || validando) return;
-    setValidando(true);
-    const result = await validateCode(codeInput);
-    if (result.ok) {
-      onApplyCode(result.code);
-      setCodeError("");
-      setCodeInput("");
-    } else {
-      setCodeError(result.error);
-    }
-    setValidando(false);
-  };
-
-  return (
-    <SheetContent side="right" className="w-full sm:max-w-md flex flex-col">
-      <SheetHeader>
-        <SheetTitle className="font-display">Tu pedido</SheetTitle>
-      </SheetHeader>
-      <div className="flex-1 overflow-y-auto py-4 space-y-3">
-        {items.length === 0 ? (
-          <div className="text-center py-10">
-            <p className="text-muted-foreground">Todavía no has agregado nada.</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Toca el + en cualquier plato del menú.
-            </p>
-          </div>
-        ) : (
-          items.map((i) => {
-            const discounted = isDiscounted(i.product);
-            return (
-              <div key={i.product.id} className="flex gap-3 bg-muted/50 rounded-xl p-2">
-                <div className="h-16 w-16 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                  {i.product.foto ? (
+                <div className="aspect-square bg-muted overflow-hidden">
+                  {p.foto ? (
                     <img
-                      src={i.product.foto}
+                      src={p.foto}
                       alt=""
                       loading="lazy"
                       decoding="async"
-                      width={64}
-                      height={64}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                     />
-                  ) : null}
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                      <ImageOff className="h-8 w-8" />
+                    </div>
+                  )}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm line-clamp-1">{i.product.nombre}</p>
-                  <div className="flex items-center gap-1.5">
-                    <p className="tabular text-brand-bright font-bold text-sm">{formatCOP(getDiscountedPrice(i.product) * i.cantidad)}</p>
-                    {discounted && <p className="text-muted-foreground text-xs line-through">{formatCOP(i.product.precio * i.cantidad)}</p>}
-                  </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <button onClick={() => setQty(i.product.id, i.cantidad - 1)}
-                      className="focus-ring h-11 w-11 rounded-full bg-card border border-border flex items-center justify-center">
-                      <Minus className="h-3 w-3" />
-                    </button>
-                    <span className="text-sm font-semibold w-5 text-center">{i.cantidad}</span>
-                    <button onClick={() => setQty(i.product.id, i.cantidad + 1)}
-                      className="focus-ring h-11 w-11 rounded-full bg-card border border-border flex items-center justify-center">
-                      <Plus className="h-3 w-3" />
-                    </button>
-                    <button onClick={() => remove(i.product.id)}
-                      className="focus-ring ml-auto h-11 w-11 -mr-1 rounded-full flex items-center justify-center text-brand-bright" aria-label="Eliminar">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
+                {/* Sin precio: la portada presenta, el menú cotiza. */}
+                <div className="p-3">
+                  <h3 className="font-semibold text-sm sm:text-base leading-tight line-clamp-2">
+                    {p.nombre}
+                  </h3>
                 </div>
-              </div>
-            );
-          })
-        )}
+              </Link>
+            ))}
       </div>
-      {items.length > 0 && (
-        <div className="border-t border-border pt-4 space-y-3">
-          {/* Código promo */}
-          <div>
-            {appliedCode ? (
-              <div className="flex items-center justify-between bg-green-500/10 border border-green-500/30 rounded-lg px-3 py-2">
-                <div>
-                  <p className="text-xs font-bold text-green-400">Código: {appliedCode.code}</p>
-                  <p className="text-xs text-muted-foreground">
-                    -{appliedCode.descuento_tipo === "porcentaje" ? `${appliedCode.descuento_valor}%` : formatCOP(appliedCode.descuento_valor)} del subtotal
-                  </p>
-                </div>
-                <button
-                  onClick={() => onApplyCode(null)}
-                  aria-label="Quitar código"
-                  className="focus-ring h-11 w-11 -mr-2 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            ) : (
-              <div className="flex gap-2">
-                <Input placeholder="Código promo" value={codeInput}
-                  onChange={(e) => { setCodeInput(e.target.value.toUpperCase()); setCodeError(""); }}
-                  onKeyDown={(e) => e.key === "Enter" && applyCode()}
-                  className="font-display tracking-widest uppercase text-sm" />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={applyCode}
-                  disabled={validando}
-                  className="shrink-0"
-                >
-                  {validando ? "…" : "Aplicar"}
-                </Button>
-              </div>
-            )}
-            {codeError && (
-              <p role="alert" className="text-xs text-brand-bright mt-1">
-                {codeError}
-              </p>
-            )}
-            <p aria-live="polite" className="sr-only">
-              {appliedCode
-                ? `Código ${appliedCode.code} aplicado. Descuento de ${formatCOP(codeDiscountAmount)}. Nuevo total ${formatCOP(totalFinal)}.`
-                : ""}
-            </p>
-          </div>
 
-          {/* Desglose */}
-          <div className="tabular space-y-1 text-sm">
-            <div className="flex justify-between text-muted-foreground">
-              <span>Subtotal</span><span>{formatCOP(subtotal)}</span>
-            </div>
-            {productDiscountTotal > 0 && (
-              <div className="flex justify-between text-green-400">
-                <span>Descuentos productos</span><span>-{formatCOP(productDiscountTotal)}</span>
-              </div>
-            )}
-            {appliedCode && codeDiscountAmount > 0 && (
-              <div className="flex justify-between text-green-400">
-                <span>Código {appliedCode.code}</span><span>-{formatCOP(codeDiscountAmount)}</span>
-              </div>
-            )}
-            {deliveryFee > 0 && (
-              <div className="flex justify-between text-muted-foreground">
-                <span>Domicilio</span><span>{formatCOP(deliveryFee)}</span>
-              </div>
-            )}
-            <div className="flex justify-between text-lg font-bold pt-1 border-t border-border">
-              <span>Total</span>
-              <span className="tabular text-brand-bright font-display">{formatCOP(totalFinal)}</span>
-            </div>
-          </div>
-
-          <Button onClick={onCheckout} size="lg" className="w-full bg-gradient-brand text-brand-foreground hover:opacity-95">
-            <Send className="h-4 w-4 mr-2" />Enviar pedido por WhatsApp
-          </Button>
-        </div>
-      )}
-    </SheetContent>
+      <Link
+        to="/menu"
+        className="focus-ring rounded mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-bright hover:underline underline-offset-4"
+      >
+        Ver la carta completa <ArrowRight className="h-4 w-4" />
+      </Link>
+    </section>
   );
 }
 
-function CheckoutModal({
-  open, onOpenChange, items, subtotal, productDiscountTotal,
-  appliedCode, codeDiscountAmount, deliveryFee, totalFinal, whatsapp, onSent,
-}: {
-  open: boolean;
-  onOpenChange: (o: boolean) => void;
-  items: ReturnType<typeof useCart>["items"];
-  subtotal: number;
-  productDiscountTotal: number;
-  appliedCode: AppliedCode | null;
-  codeDiscountAmount: number;
-  deliveryFee: number;
-  totalFinal: number;
-  whatsapp: string;
-  onSent: () => void;
-}) {
-  const [nombre, setNombre] = useState("");
-  const [direccion, setDireccion] = useState("");
-  const [telefono, setTelefono] = useState("");
-  const [pago, setPago] = useState("Efectivo");
-  const [errors, setErrors] = useState<{ nombre?: string; direccion?: string; telefono?: string }>({});
-  const [enviando, setEnviando] = useState(false);
+function DondeYCuando() {
+  const { state, loading } = useAppState();
+  const isOpen = useIsOpenNow();
+  const filas = groupSchedule(state.config.schedule);
 
-  // Un número colombiano son 10 dígitos; se aceptan 7 (fijo) a 15 (E.164).
-  const validate = () => {
-    const next: typeof errors = {};
-    if (!nombre.trim()) next.nombre = "Necesitamos tu nombre para el pedido.";
-    if (!direccion.trim()) next.direccion = "Sin dirección no podemos llevarlo.";
-    const digits = telefono.replace(/\D/g, "");
-    if (!digits) next.telefono = "Necesitamos un número para confirmarte.";
-    else if (digits.length < 7 || digits.length > 15) next.telefono = "Ese número no parece completo.";
-    setErrors(next);
-    return Object.keys(next).length === 0;
-  };
-
-  const enviar = () => {
-    if (enviando) return; // evita doble envío si tocan dos veces
-    if (!validate()) return;
-
-    const destino = whatsapp.replace(/\D/g, "");
-    if (!destino) {
-      setErrors({
-        telefono: "El restaurante aún no configuró su WhatsApp. Escríbenos por Instagram.",
-      });
-      return;
-    }
-    setEnviando(true);
-
-    const detalle = items
-      .map((i) => {
-        const dp = getDiscountedPrice(i.product);
-        const disc = isDiscounted(i.product) ? ` (antes ${formatCOP(i.product.precio)})` : "";
-        return `   - ${i.cantidad}x ${i.product.nombre} — ${formatCOP(dp * i.cantidad)}${disc}`;
-      })
-      .join("\n");
-    const discLines = [
-      productDiscountTotal > 0 ? `\n- Descuento productos: -${formatCOP(productDiscountTotal)}` : "",
-      appliedCode ? `\n- Código ${appliedCode.code}: -${formatCOP(codeDiscountAmount)}` : "",
-      deliveryFee > 0 ? `\n- Domicilio: ${formatCOP(deliveryFee)}` : "",
-    ].join("");
-    const msg = `Hola! quisiera hacer un pedido:
-
-- Nombre completo: ${nombre}
-
-- Pedido detallado:
-${detalle}
-
-- Dirección + punto de referencia: ${direccion}
-
-- Número de contacto: ${telefono}
-
-- Medio de pago: ${pago}
-${discLines}
-Total: ${formatCOP(totalFinal)}`;
-    const url = `https://wa.me/${destino}?text=${encodeURIComponent(msg)}`;
-    window.open(url, "_blank", "noopener,noreferrer");
-    onSent();
-    setNombre("");
-    setDireccion("");
-    setTelefono("");
-    setPago("Efectivo");
-    setErrors({});
-    setEnviando(false);
-  };
-
-  const opciones = ["Efectivo", "Nequi", "Bancolombia", "Otro"];
+  const whatsapp = (state.config.whatsapp ?? "").replace(/\D/g, "");
+  const instagram = (state.config.instagram ?? "").trim();
+  const direccion = (state.config.direccion ?? "").trim();
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="font-display text-xl">Datos de entrega</DialogTitle>
-          <DialogDescription>Completa para enviar tu pedido por WhatsApp.</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3 mt-2">
-          <div>
-            <Label htmlFor="nombre">Nombre completo</Label>
-            <Input
-              id="nombre"
-              value={nombre}
-              onChange={(e) => { setNombre(e.target.value); setErrors((p) => ({ ...p, nombre: undefined })); }}
-              maxLength={80}
-              autoComplete="name"
-              aria-invalid={!!errors.nombre}
-              aria-describedby={errors.nombre ? "nombre-error" : undefined}
-            />
-            {errors.nombre && (
-              <p id="nombre-error" className="text-xs text-brand-bright mt-1">{errors.nombre}</p>
-            )}
+    // Sin entrada. Esta sección son horarios y una dirección: datos que alguien
+    // viene a comprobar, no un momento que haya que presentar. Animarla sólo
+    // porque está ahí es lo que convierte una portada en una feria.
+    <section className="max-w-5xl mx-auto px-4 py-20 sm:py-28">
+      <h2 className="font-display text-2xl sm:text-3xl font-bold">Cuándo y dónde</h2>
+
+      <div className="mt-8 grid gap-4 sm:grid-cols-2 max-w-3xl">
+        <div className="bg-card rounded-2xl border border-border/60 p-5">
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-brand-bright shrink-0" />
+            <h3 className="font-semibold">Horario</h3>
+            <EstadoChip isOpen={isOpen} />
           </div>
-          <div>
-            <Label htmlFor="dir">Dirección + punto de referencia</Label>
-            <Textarea
-              id="dir"
-              value={direccion}
-              onChange={(e) => { setDireccion(e.target.value); setErrors((p) => ({ ...p, direccion: undefined })); }}
-              maxLength={240}
-              rows={2}
-              autoComplete="street-address"
-              aria-invalid={!!errors.direccion}
-              aria-describedby={errors.direccion ? "dir-error" : undefined}
-            />
-            {errors.direccion && (
-              <p id="dir-error" className="text-xs text-brand-bright mt-1">{errors.direccion}</p>
-            )}
-          </div>
-          <div>
-            <Label htmlFor="tel">Número de contacto</Label>
-            <Input
-              id="tel"
-              type="tel"
-              value={telefono}
-              onChange={(e) => { setTelefono(e.target.value); setErrors((p) => ({ ...p, telefono: undefined })); }}
-              inputMode="tel"
-              maxLength={20}
-              autoComplete="tel"
-              aria-invalid={!!errors.telefono}
-              aria-describedby={errors.telefono ? "tel-error" : undefined}
-            />
-            {errors.telefono && (
-              <p id="tel-error" className="text-xs text-brand-bright mt-1">{errors.telefono}</p>
-            )}
-          </div>
-          <div>
-            <Label>Medio de pago</Label>
-            <div className="flex flex-wrap gap-2 mt-1">
-              {opciones.map((o) => (
-                <button
-                  key={o}
-                  type="button"
-                  onClick={() => setPago(o)}
-                  className={`focus-ring px-3 py-2 rounded-full text-sm border transition ${
-                    pago === o
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-card border-border hover:bg-muted"
-                  }`}
-                >
-                  {o}
-                </button>
-              ))}
+          {loading ? (
+            <div className="mt-4 space-y-2">
+              <Skeleton className="h-4 w-40" />
             </div>
-          </div>
-          {/* Habilitado siempre a propósito: un botón muerto no explica qué
-              falta. Al tocarlo, validate() señala el campo incompleto. */}
-          <Button
-            onClick={enviar}
-            disabled={enviando}
-            size="lg"
-            className="w-full bg-gradient-brand text-brand-foreground"
-          >
-            <Send className="h-4 w-4 mr-2" /> Enviar por WhatsApp
-          </Button>
+          ) : (
+            <dl className="mt-4 space-y-1.5 text-sm">
+              {filas.map((f) => (
+                <div key={f.dias} className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">{f.dias}</dt>
+                  <dd className="tabular font-medium">{f.horario}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
         </div>
-      </DialogContent>
-    </Dialog>
+
+        {/* Sin dirección configurada no se pinta una tarjeta vacía: la columna
+            desaparece y la de horario ocupa el ancho que le toque. */}
+        {direccion && (
+          <div className="bg-card rounded-2xl border border-border/60 p-5">
+            <div className="flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-brand-bright shrink-0" />
+              <h3 className="font-semibold">Dónde estamos</h3>
+            </div>
+            <p className="mt-4 text-sm text-muted-foreground">{direccion}</p>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-8 flex flex-wrap gap-3">
+        {whatsapp && (
+          <a
+            href={`https://wa.me/${whatsapp}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="focus-ring inline-flex h-12 items-center justify-center rounded-md bg-gradient-brand px-6 text-sm font-bold text-brand-foreground hover:opacity-95 transition"
+          >
+            Escríbenos por WhatsApp
+          </a>
+        )}
+        {instagram && (
+          <a
+            href={`https://instagram.com/${instagram}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="focus-ring inline-flex h-12 items-center justify-center gap-2 rounded-md border border-input px-6 text-sm font-semibold hover:bg-muted transition"
+          >
+            <Instagram className="h-4 w-4" />@{instagram}
+          </a>
+        )}
+      </div>
+    </section>
   );
 }

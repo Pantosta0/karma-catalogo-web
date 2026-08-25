@@ -11,7 +11,10 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as PoliticaDePrivacidadYUsoDeDatosRouteImport } from './routes/politica-de-privacidad-y-uso-de-datos'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as MenuRouteRouteImport } from './routes/menu/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as MenuIndexRouteImport } from './routes/menu/index'
+import { Route as MenuCategoriaRouteImport } from './routes/menu/$categoria'
 
 const PoliticaDePrivacidadYUsoDeDatosRoute =
   PoliticaDePrivacidadYUsoDeDatosRouteImport.update({
@@ -24,38 +27,80 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MenuRouteRoute = MenuRouteRouteImport.update({
+  id: '/menu',
+  path: '/menu',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MenuIndexRoute = MenuIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => MenuRouteRoute,
+} as any)
+const MenuCategoriaRoute = MenuCategoriaRouteImport.update({
+  id: '/$categoria',
+  path: '/$categoria',
+  getParentRoute: () => MenuRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/menu': typeof MenuRouteRouteWithChildren
   '/admin': typeof AdminRoute
   '/politica-de-privacidad-y-uso-de-datos': typeof PoliticaDePrivacidadYUsoDeDatosRoute
+  '/menu/$categoria': typeof MenuCategoriaRoute
+  '/menu/': typeof MenuIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/politica-de-privacidad-y-uso-de-datos': typeof PoliticaDePrivacidadYUsoDeDatosRoute
+  '/menu/$categoria': typeof MenuCategoriaRoute
+  '/menu': typeof MenuIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/menu': typeof MenuRouteRouteWithChildren
   '/admin': typeof AdminRoute
   '/politica-de-privacidad-y-uso-de-datos': typeof PoliticaDePrivacidadYUsoDeDatosRoute
+  '/menu/$categoria': typeof MenuCategoriaRoute
+  '/menu/': typeof MenuIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin' | '/politica-de-privacidad-y-uso-de-datos'
+  fullPaths:
+    | '/'
+    | '/menu'
+    | '/admin'
+    | '/politica-de-privacidad-y-uso-de-datos'
+    | '/menu/$categoria'
+    | '/menu/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/politica-de-privacidad-y-uso-de-datos'
-  id: '__root__' | '/' | '/admin' | '/politica-de-privacidad-y-uso-de-datos'
+  to:
+    | '/'
+    | '/admin'
+    | '/politica-de-privacidad-y-uso-de-datos'
+    | '/menu/$categoria'
+    | '/menu'
+  id:
+    | '__root__'
+    | '/'
+    | '/menu'
+    | '/admin'
+    | '/politica-de-privacidad-y-uso-de-datos'
+    | '/menu/$categoria'
+    | '/menu/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  MenuRouteRoute: typeof MenuRouteRouteWithChildren
   AdminRoute: typeof AdminRoute
   PoliticaDePrivacidadYUsoDeDatosRoute: typeof PoliticaDePrivacidadYUsoDeDatosRoute
 }
@@ -76,6 +121,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/menu': {
+      id: '/menu'
+      path: '/menu'
+      fullPath: '/menu'
+      preLoaderRoute: typeof MenuRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -83,11 +135,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/menu/': {
+      id: '/menu/'
+      path: '/'
+      fullPath: '/menu/'
+      preLoaderRoute: typeof MenuIndexRouteImport
+      parentRoute: typeof MenuRouteRoute
+    }
+    '/menu/$categoria': {
+      id: '/menu/$categoria'
+      path: '/$categoria'
+      fullPath: '/menu/$categoria'
+      preLoaderRoute: typeof MenuCategoriaRouteImport
+      parentRoute: typeof MenuRouteRoute
+    }
   }
 }
 
+interface MenuRouteRouteChildren {
+  MenuCategoriaRoute: typeof MenuCategoriaRoute
+  MenuIndexRoute: typeof MenuIndexRoute
+}
+
+const MenuRouteRouteChildren: MenuRouteRouteChildren = {
+  MenuCategoriaRoute: MenuCategoriaRoute,
+  MenuIndexRoute: MenuIndexRoute,
+}
+
+const MenuRouteRouteWithChildren = MenuRouteRoute._addFileChildren(
+  MenuRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  MenuRouteRoute: MenuRouteRouteWithChildren,
   AdminRoute: AdminRoute,
   PoliticaDePrivacidadYUsoDeDatosRoute: PoliticaDePrivacidadYUsoDeDatosRoute,
 }
